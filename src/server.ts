@@ -1,10 +1,14 @@
-import express from "express";
+import "dotenv/config";
+import express, { Router } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import { addWorkoutRoutes } from "./modules/workouts/workout.routes";
+import createUserRoutes from "./modules/users/users.routes";
 
 const app = express();
+const router = Router();
 
 app.use(helmet());
 
@@ -28,6 +32,14 @@ app.get("/health", (_, res) => {
     message: "Backend running",
   });
 });
+
+console.log("Adding workout routes before router");
+app.post("/api/workouts", addWorkoutRoutes);
+console.log("Adding workout routes after router");
+
+console.log("Adding user routes before router");
+app.post("/api/users", createUserRoutes);
+console.log("Adding user routes after router");
 
 const PORT = process.env.PORT || 5001;
 
