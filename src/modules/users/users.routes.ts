@@ -1,9 +1,12 @@
-import { Request, Response } from "express";
-import { createUser as createUserService } from "./users.service";
+import { Router } from "express";
+import { createUser, getUsers } from "./users.controllers";
 
-const createUserRoutes = async (req: Request, res: Response): Promise<void> => {
-  console.log("Creating user", req);
-  createUserService(req, res);
-};
+const usersRoutes = Router();
 
-export default createUserRoutes;
+usersRoutes.post("/", createUser);
+usersRoutes.get("/", getUsers);
+// usersRoutes.get("/:id", getUserById);
+// usersRoutes.put("/:id", updateUser);
+// usersRoutes.delete("/:id", deleteUser);
+
+export default usersRoutes;

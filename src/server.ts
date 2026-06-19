@@ -1,15 +1,19 @@
 import "dotenv/config";
-import express, { Router } from "express";
+import express, { NextFunction, Router } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
-import { addWorkoutRoutes } from "./modules/workouts/workout.routes";
-import createUserRoutes from "./modules/users/users.routes";
+
+import router from "./routes/index";
+
+// function logger(req: Request, res: Response, next: NextFunction) {
+//   console.log(`${req.method} ${req.url}`);
+
+//   next();
+// }
 
 const app = express();
-const router = Router();
-
 app.use(helmet());
 
 app.use(
@@ -25,6 +29,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use(morgan("dev"));
+// app.use(logger as any);
 
 app.get("/health", (_, res) => {
   res.json({
@@ -33,13 +38,7 @@ app.get("/health", (_, res) => {
   });
 });
 
-console.log("Adding workout routes before router");
-app.post("/api/workouts", addWorkoutRoutes);
-console.log("Adding workout routes after router");
-
-console.log("Adding user routes before router");
-app.post("/api/users", createUserRoutes);
-console.log("Adding user routes after router");
+app.use("/api", router);
 
 const PORT = process.env.PORT || 5001;
 
