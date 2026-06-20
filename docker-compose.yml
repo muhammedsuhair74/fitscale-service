@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fitscale
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fitscale"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Overrides any DATABASE_URL in .env so it points at the db service
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/fitscale?schema=public"
+      PORT: "5001"
+      NODE_ENV: production
+      JWT_SECRET: "${JWT_SECRET:-change-me-in-env}"
+    ports:
+      - "5001:5001"
+    # Sync the schema, then start the server
+    command: sh -c "npx prisma db push && node dist/server.js"
+
+volumes:
+  pgdata:
