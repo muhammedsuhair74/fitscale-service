@@ -5,14 +5,18 @@ import {
   registerUserController,
   refreshTokenController,
 } from "./auth.controllers";
+import { validateBody } from "../../middleware/validate.middleware";
+import { loginSchema, registerSchema } from "../../validators/auth.schema";
 
 const authRoutes = Router();
 
-console.log("Auth routes");
-
-authRoutes.post("/login", loginUserController);
+authRoutes.post("/login", validateBody(loginSchema), loginUserController);
 authRoutes.post("/logout", logoutUserController);
-authRoutes.post("/register", registerUserController);
+authRoutes.post(
+  "/register",
+  validateBody(registerSchema),
+  registerUserController,
+);
 authRoutes.post("/refresh-token", refreshTokenController);
 
 export default authRoutes;

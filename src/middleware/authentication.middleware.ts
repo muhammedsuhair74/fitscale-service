@@ -6,12 +6,12 @@ export function authMiddleware(
   res: Response,
   next: NextFunction,
 ) {
-  const bearerToken = req.headers.authorization?.split(" ")[1];
-  const token = req.cookies?.token || bearerToken;
+  const token = req.cookies?.accessToken;
 
   if (!token) {
     return res.status(401).json({
       message: "Unauthorized",
+      success: false,
     });
   }
 
@@ -22,6 +22,7 @@ export function authMiddleware(
   } catch {
     return res.status(401).json({
       message: "Invalid token",
+      success: false,
     });
   }
 }

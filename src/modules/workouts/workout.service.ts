@@ -1,28 +1,25 @@
-import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
+import { Workout, WorkoutType } from "@prisma/client";
 
-export const getWorkouts = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  console.log("Getting workouts", req);
-  const workouts = await prisma.workout.findMany({
+export const getWorkoutsService = async (
+  userId: string,
+): Promise<Workout[]> => {
+  return prisma.workout.findMany({
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
-  res.status(200).json(workouts);
 };
 
-export const createWorkout = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  console.log("Creating workout", req);
-  const workout = await prisma.workout.create({
+export const createWorkoutService = async (
+  userId: string,
+  workoutType: WorkoutType,
+  count: number,
+): Promise<Workout> => {
+  return prisma.workout.create({
     data: {
-      workoutType: req.body.workoutType,
-      count: req.body.count,
-      userId: req.body.userId,
+      workoutType,
+      count,
+      userId,
     },
   });
-  res.status(201).json(workout);
 };

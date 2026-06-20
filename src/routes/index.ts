@@ -2,7 +2,7 @@ import { Router } from "express";
 import workoutRoutes from "../modules/workouts/workout.routes";
 import usersRoutes from "../modules/users/users.routes";
 import authRoutes from "../modules/auth/auth.routes";
-import { authMiddleware } from "../middleware/auth.middleware";
+import { authMiddleware } from "../middleware/authentication.middleware";
 
 const router = Router();
 
