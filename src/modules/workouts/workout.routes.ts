@@ -1,10 +1,9 @@
-import { Request, Response } from "express";
-import { createWorkout } from "./workout.service";
+import { Request, Response, Router } from "express";
+import { createWorkout, getWorkouts } from "./workout.service";
 
-export const addWorkoutRoutes = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  console.log("Adding workout routes", req);
-  createWorkout(req, res);
-};
+const workoutRoutes = Router();
+
+workoutRoutes.post("/", createWorkout);
+workoutRoutes.get("/", getWorkouts);
+
+export default workoutRoutes;
