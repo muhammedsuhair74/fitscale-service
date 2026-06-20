@@ -1,9 +1,18 @@
-import { Request, Response, Router } from "express";
-import { createWorkout, getWorkouts } from "./workout.service";
+import { Router } from "express";
+import {
+  createWorkoutController,
+  getWorkoutsController,
+} from "./workout.controller";
+import { validateBody } from "../../middleware/validate.middleware";
+import { createWorkoutSchema } from "../../validators/workouts.schema";
 
 const workoutRoutes = Router();
 
-workoutRoutes.post("/", createWorkout);
-workoutRoutes.get("/", getWorkouts);
+workoutRoutes.post(
+  "/",
+  validateBody(createWorkoutSchema),
+  createWorkoutController,
+);
+workoutRoutes.get("/", getWorkoutsController);
 
 export default workoutRoutes;

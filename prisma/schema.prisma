@@ -11,6 +11,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRoles {
+  ADMIN
+  TRAINER
+  USER
+}
+
 enum WorkoutType {
   PUSHUP
   SQUAT
@@ -22,6 +28,8 @@ model User {
   id String @id @default(uuid())
   email String @unique
   passwordHash String
+  role UserRoles @default(USER)
+  token String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   workouts Workout[]

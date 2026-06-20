@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express, { NextFunction, Router } from "express";
+import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -7,19 +7,14 @@ import cookieParser from "cookie-parser";
 
 import router from "./routes/index";
 
-// function logger(req: Request, res: Response, next: NextFunction) {
-//   console.log(`${req.method} ${req.url}`);
-
-//   next();
-// }
-
 const app = express();
 app.use(helmet());
 
+const clientOrigin = process.env.CLIENT_URL ?? "http://localhost:3000";
+
 app.use(
   cors({
-    // origin: "http://localhost:3000",
-    origin: "*",
+    origin: clientOrigin,
     credentials: true,
   }),
 );
@@ -29,7 +24,6 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use(morgan("dev"));
-// app.use(logger as any);
 
 app.get("/health", (_, res) => {
   res.json({

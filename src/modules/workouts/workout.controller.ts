@@ -1,28 +1,47 @@
 import { Request, Response } from "express";
-import { createWorkout as createWorkoutService } from "./workout.service";
+import { createWorkoutService, getWorkoutsService } from "./workout.service";
 
-export const createWorkout = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  console.log("Creating workout", req);
-  const workout = await createWorkoutService(req, res);
-  res.status(201).json({
-    workout,
-    success: true,
-    message: "Workout created successfully",
-  });
+type AuthUser = {
+  userId: string;
 };
 
-export const getWorkouts = async (
+export const createWorkoutController = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  console.log("Getting workouts", req);
-  const workouts = await getWorkoutsService(req, res);
-  res.status(200).json({
-    workouts,
-    success: true,
-    message: "Workouts fetched successfully",
-  });
+  try {
+    const { userId } = (req as Request & { user: AuthUser }).user;
+    const { workoutType, count } = req.body;
+    const workout = await createWorkoutService(userId, workoutType, count);
+    res.status(201).json({
+      workout,
+      success: true,
+      message: "Workout created successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const getWorkoutsController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { userId } = (req as Request & { user: AuthUser }).user;
+    const workouts = await getWorkoutsService(userId);
+    res.status(200).json({
+      workouts,
+      success: true,
+      message: "Workouts fetched successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
 };

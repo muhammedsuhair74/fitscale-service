@@ -3,23 +3,22 @@ import {
   loginUserService,
   logoutUserService,
   registerUserService,
+  refreshTokenService,
+  setTokensService,
+  getRefreshTokenRemainingSeconds,
 } from "./auth.services";
-import jwt from "jsonwebtoken";
+import {
+  clearAuthCookies,
+  setAuthCookies,
+} from "./auth.utils";
+import { sanitizeUser } from "../../utils/user";
 
 export const loginUserController = async (req: Request, res: Response) => {
   try {
-    const user = await loginUserService(req, res);
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "1h" },
-    );
-    res.setHeader(
-      "Set-Cookie",
-      `token=${token}; HttpOnly; Secure; Max-Age=3600000; Path=/`,
-    );
+    const result = await loginUserService(req.body.email, req.body.password);
+    setAuthCookies(res, result.tokens);
     res.status(200).json({
-      user: user,
+      user: sanitizeUser(result.user),
       success: true,
       message: "User logged in successfully",
     });
@@ -32,16 +31,40 @@ export const loginUserController = async (req: Request, res: Response) => {
   }
 };
 
+export const refreshTokenController = async (req: Request, res: Response) => {
+  try {
+    const oldRefreshToken = req.cookies.refreshToken as string;
+    const result = await refreshTokenService(oldRefreshToken);
+    const remainingRefreshSeconds =
+      getRefreshTokenRemainingSeconds(oldRefreshToken);
+    const tokens = await setTokensService(result.user, remainingRefreshSeconds);
+
+    setAuthCookies(res, tokens);
+    res.status(200).json({
+      user: sanitizeUser(result.user),
+      success: true,
+      message: "Token refreshed successfully",
+    });
+  } catch (error) {
+    console.error("Error refreshing token:", (error as Error).message);
+    res.status(401).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
 export const logoutUserController = async (req: Request, res: Response) => {
   try {
-    const result = await logoutUserService(req, res);
-    res.clearCookie("token");
+    const refreshToken = req.cookies.refreshToken as string;
+    const result = await logoutUserService(refreshToken);
+    clearAuthCookies(res);
     res.status(200).json({
       message: result.message,
       success: result.success,
     });
   } catch (error) {
-    res.status(400).json({
+    res.status(401).json({
       message: (error as Error).message,
       success: false,
     });
@@ -50,10 +73,10 @@ export const logoutUserController = async (req: Request, res: Response) => {
 
 export const registerUserController = async (req: Request, res: Response) => {
   try {
-    const result = await registerUserService(req, res);
+    const result = await registerUserService(req.body.email, req.body.password);
     res.status(201).json({
-      user: result.user,
-      success: result.success,
+      user: sanitizeUser(result.user),
+      success: true,
       message: result.message,
     });
   } catch (error) {
