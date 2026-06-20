@@ -3,21 +3,35 @@ import {
   loginUserService,
   logoutUserService,
   registerUserService,
+  refreshTokenService,
 } from "./auth.services";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 export const loginUserController = async (req: Request, res: Response) => {
   try {
     const user = await loginUserService(req, res);
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET as string,
       { expiresIn: "1h" },
     );
-    res.setHeader(
-      "Set-Cookie",
-      `token=${token}; HttpOnly; Secure; Max-Age=3600000; Path=/`,
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_REFRESH_SECRET as string,
+      { expiresIn: "7d" },
     );
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 3600000,
+      path: "/",
+    });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 604800000,
+      path: "/",
+    });
     res.status(200).json({
       user: user,
       success: true,
@@ -32,10 +46,63 @@ export const loginUserController = async (req: Request, res: Response) => {
   }
 };
 
+export const refreshTokenController = async (req: Request, res: Response) => {
+  try {
+    const result = (await refreshTokenService(req, res)) as JwtPayload;
+    const oldRefreshToken = req.cookies?.refreshToken;
+    const expiryOfOldRefreshToken = (
+      jwt.verify(
+        oldRefreshToken,
+        process.env.JWT_REFRESH_SECRET as string,
+      ) as JwtPayload
+    ).exp;
+    const newRefreshTokenExpiry = expiryOfOldRefreshToken
+      ? expiryOfOldRefreshToken - Date.now()
+      : 604800000;
+
+    const accessToken = jwt.sign(
+      { userId: result.userId },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" },
+    );
+    const refreshToken = jwt.sign(
+      { userId: result.userId },
+      process.env.JWT_REFRESH_SECRET as string,
+      {
+        expiresIn: newRefreshTokenExpiry,
+      },
+    );
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 3600000,
+      path: "/",
+    });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      maxAge: newRefreshTokenExpiry,
+      path: "/",
+    });
+    res.status(200).json({
+      user: result,
+      success: true,
+      message: "Token refreshed successfully",
+    });
+  } catch (error) {
+    console.error("Error refreshing token:", (error as Error).message);
+    res.status(401).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
 export const logoutUserController = async (req: Request, res: Response) => {
   try {
     const result = await logoutUserService(req, res);
-    res.clearCookie("token");
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
     res.status(200).json({
       message: result.message,
       success: result.success,

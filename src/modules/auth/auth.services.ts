@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../../lib/prisma";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 export const loginUserService = async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -17,8 +18,16 @@ export const loginUserService = async (req: Request, res: Response) => {
   return user;
 };
 
+export const refreshTokenService = async (req: Request, res: Response) => {
+  const { refreshToken } = req.cookies;
+  if (!refreshToken) {
+    throw new Error("Refresh token not found");
+  }
+  const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!);
+  return decoded;
+};
+
 export const logoutUserService = async (req: Request, res: Response) => {
-  res.clearCookie("token");
   return {
     success: true,
     message: "User logged out successfully",
