@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 
+import "./lib/redis";
 import router from "./routes/index";
 
 const app = express();

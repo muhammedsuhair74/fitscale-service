@@ -2,9 +2,16 @@ import { Router } from "express";
 import {
   createWorkoutController,
   getWorkoutsController,
+  getWorkoutByIdController,
 } from "./workout.controller";
-import { validateBody } from "../../middleware/validate.middleware";
-import { createWorkoutSchema } from "../../validators/workouts.schema";
+import {
+  validateBody,
+  validateParams,
+} from "../../middleware/validate.middleware";
+import {
+  createWorkoutSchema,
+  workoutIdParamSchema,
+} from "../../validators/workouts.schema";
 
 const workoutRoutes = Router();
 
@@ -14,5 +21,10 @@ workoutRoutes.post(
   createWorkoutController,
 );
 workoutRoutes.get("/", getWorkoutsController);
+workoutRoutes.get(
+  "/:id",
+  validateParams(workoutIdParamSchema),
+  getWorkoutByIdController,
+);
 
 export default workoutRoutes;

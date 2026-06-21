@@ -1,21 +1,78 @@
 # Fitscale Backend
 
-REST API for Fitscale, built with **Express 5**, **TypeScript**, and **Prisma** (PostgreSQL). It handles authentication, users, and workout tracking.
+REST API for Fitscale — user auth, user management, and workout tracking. Built with **Express 5**, **TypeScript**, **Prisma** (PostgreSQL), and **Redis**.
 
 ## Tech Stack
 
-- **Runtime:** Node.js + Express 5
-- **Language:** TypeScript
-- **Database:** PostgreSQL via Prisma ORM (with the `@prisma/adapter-pg` driver adapter)
-- **Auth:** JWT (`jsonwebtoken`) stored in an httpOnly cookie, passwords hashed with `bcrypt`
-- **Security/Tooling:** `helmet`, `cors`, `cookie-parser`, `morgan`, `dotenv`, `zod`
+| Layer | Technology |
+| ----- | ---------- |
+| Runtime | Node.js 20+ |
+| Framework | Express 5 |
+| Language | TypeScript |
+| Database | PostgreSQL 16 (Prisma ORM + `@prisma/adapter-pg`) |
+| Cache / sessions | Redis 7 (`redis` npm package) |
+| Auth | JWT in httpOnly cookies, bcrypt password hashing |
+| Validation | Zod |
+| Reverse proxy | Nginx (Docker only) |
+| Tooling | helmet, cors, cookie-parser, morgan, dotenv |
+
+---
 
 ## Prerequisites
 
-- **Node.js** >= 20 LTS (includes `npm`)
-- **PostgreSQL** >= 14 running locally or remotely
+- **Node.js** >= 20 LTS
+- **PostgreSQL** >= 14 (local or Docker)
+- **Redis** >= 7 (local or Docker)
+- **Docker + Docker Compose** (optional, for containerized setup)
 
-## Getting Started
+---
+
+## Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# PostgreSQL
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
+
+# JWT secrets — use different values in production
+JWT_SECRET="<long-random-secret>"
+JWT_REFRESH_SECRET="<another-long-random-secret>"
+
+# Redis
+REDIS_URL="redis://localhost:6379"
+
+# Server
+PORT=5001
+NODE_ENV=development
+
+# Frontend origin for CORS (cookie auth requires a specific origin)
+CLIENT_URL="http://localhost:3000"
+```
+
+Generate secrets:
+
+```bash
+openssl rand -hex 32
+```
+
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `DATABASE_URL` | Yes | Postgres connection string |
+| `JWT_SECRET` | Yes | Signs access tokens (1h) |
+| `JWT_REFRESH_SECRET` | Yes | Signs refresh tokens (7d) |
+| `REDIS_URL` | Yes | Redis connection URL |
+| `PORT` | No | API port (default `5001`) |
+| `NODE_ENV` | No | `development` or `production` |
+| `CLIENT_URL` | No | Allowed CORS origin (default `http://localhost:3000`) |
+
+> **macOS:** avoid `PORT=5000` — AirPlay Receiver uses it and returns HTTP 403. Default is `5001`.
+
+> **Never commit `.env`** — it is listed in `.gitignore`.
+
+---
+
+## Local Development Setup
 
 ### 1. Install dependencies
 
@@ -23,207 +80,196 @@ REST API for Fitscale, built with **Express 5**, **TypeScript**, and **Prisma** 
 npm install
 ```
 
-### 2. Configure environment variables
+### 2. Start PostgreSQL and Redis
 
-Create a `.env` file in the project root:
+**Option A — Docker (recommended for dependencies only):**
 
 ```bash
-# PostgreSQL connection string
+docker compose up db redis -d
+```
+
+**Option B — Install locally:**
+
+- Postgres: `brew install postgresql@16` (macOS) or your OS package manager
+- Redis: `brew install redis && brew services start redis` (macOS)
+
+### 3. Configure `.env`
+
+Use the template above. For Docker-backed dependencies:
+
+```bash
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
-
-# Secret used to sign JWTs (use a long random value)
-JWT_SECRET="replace-with-a-long-random-secret"
-
-# Optional
-PORT=5001
-NODE_ENV=development
+REDIS_URL="redis://localhost:6379"
 ```
 
-> Generate a strong secret with: `openssl rand -hex 32`
-
-> [!WARNING]
-> On macOS, avoid `PORT=5000` — it's used by the AirPlay Receiver (Control Center) and returns `HTTP 403`. The default is `5001`.
-
-### 3. Set up the database
-
-Generate the Prisma client and create the tables from `prisma/schema.prisma`:
-
-```bash
-npx prisma generate     # generate the typed Prisma client
-npx prisma db push      # sync the schema to your database (no migration history)
-```
-
-`db push` is quick for prototyping but does **not** create migration files. For a tracked, repeatable schema history use migrations (below).
-
-## Database Migrations
-
-Prisma migrations live in `prisma/migrations/`. Use them to version your schema changes.
-
-### Creating the first migration
-
-Choose one of the two approaches depending on whether you need to keep existing data.
-
-**A. Fresh start — drops all tables/data** (simplest; use when the data is disposable):
-
-```bash
-npx prisma migrate dev --name init
-```
-
-When prompted about resetting the database, confirm. This resets the DB, creates `prisma/migrations/<timestamp>_init/`, applies it, and regenerates the client.
-
-To reset on demand at any time (also **drops all data**):
-
-```bash
-npx prisma migrate reset
-```
-
-**B. Baseline — keeps existing data** (use when the database already has data created via `db push`):
-
-```bash
-# 1. Create the init migration folder
-mkdir -p prisma/migrations/0_init
-
-# 2. Generate SQL for the current schema from an empty baseline
-npx prisma migrate diff \
-  --from-empty \
-  --to-schema-datamodel prisma/schema.prisma \
-  --script > prisma/migrations/0_init/migration.sql
-
-# 3. Mark it as already applied (does NOT modify your data)
-npx prisma migrate resolve --applied 0_init
-```
-
-### Ongoing workflow
-
-After editing `prisma/schema.prisma`, create and apply a new migration in development:
-
-```bash
-npx prisma migrate dev --name describe_your_change
-```
-
-### Applying migrations in production
-
-```bash
-npx prisma migrate deploy
-```
-
-> In Docker, switch the `api` service command in `docker-compose.yml` from `npx prisma db push` to `npx prisma migrate deploy` to apply migrations on startup.
-
-## Syncing Schema Changes to the Database
-
-When you edit `prisma/schema.prisma` — for example, adding a column, model, or enum — use one of the flows below to update your Postgres database and keep the Prisma Client in sync.
-
-### Check migration status
-
-See whether pending migrations exist and if the database matches `prisma/migrations/`:
-
-```bash
-npx prisma migrate status
-```
-
-### Development — recommended (migrations)
-
-After editing the schema, create and apply a migration in one step:
-
-```bash
-npx prisma migrate dev --name describe_your_change
-```
-
-This creates a folder under `prisma/migrations/`, runs the SQL against your local database, and regenerates the Prisma Client. Use a descriptive name (e.g. `add_user_token`).
-
-If you already created the migration file manually, apply pending migrations with:
-
-```bash
-npx prisma migrate deploy
-```
-
-After any schema change, ensure the client is up to date:
+### 4. Sync the database
 
 ```bash
 npx prisma generate
+npx prisma migrate dev
 ```
 
-(`migrate dev` runs this automatically.)
-
-### Quick sync — prototyping only (`db push`)
-
-```bash
-npx prisma db push
-```
-
-Syncs the schema directly without creating migration files. Fine for early experiments; prefer migrations once you need version history or production deploys.
-
-### Production / Docker
-
-```bash
-npx prisma migrate deploy
-```
-
-Applies pending migrations without prompts. In Docker, use `migrate deploy` instead of `db push` on startup (see [Database Migrations](#database-migrations) above).
-
-### Typical workflow (add a column)
-
-Example: add `token String?` to the `User` model.
-
-1. Edit `prisma/schema.prisma`
-2. Run `npx prisma migrate dev --name add_user_token`
-3. Update your services/controllers to use the new field
-4. Restart the dev server: `npm run dev`
-
-### When the database and schema are out of sync
-
-| Situation                                              | Command                                                               |
-| ------------------------------------------------------ | --------------------------------------------------------------------- |
-| Migration exists but was not applied                   | `npx prisma migrate deploy`                                           |
-| Schema changed but no migration yet                    | `npx prisma migrate dev --name your_change`                           |
-| Fresh start (drops all data)                           | `npx prisma migrate reset`                                            |
-| DB was created with `db push`, switching to migrations | See **B. Baseline** under [Database Migrations](#database-migrations) |
-
-## Running the Project
-
-| Command         | Description                                               |
-| --------------- | --------------------------------------------------------- |
-| `npm run dev`   | Start in development with hot reload (`ts-node-dev`)      |
-| `npm run build` | Compile TypeScript to `dist/`                             |
-| `npm start`     | Run the compiled production build (`node dist/server.js`) |
-
-### Development
+### 5. Start the API
 
 ```bash
 npm run dev
 ```
 
-The server starts on `http://localhost:5001` (or your `PORT`). Verify it's running:
+Verify:
 
 ```bash
 curl http://localhost:5001/health
-# { "success": true, "message": "Backend running" }
+# {"success":true,"message":"Backend running"}
 ```
 
-### Production
+You should also see `Redis Connected` in the server logs.
+
+---
+
+## Redis
+
+### What Redis is used for
+
+Redis is configured as a shared client in `src/lib/redis.ts`. The server imports it on startup (`src/server.ts`) so the connection is established before handling requests. Use the exported `redis` client anywhere you need caching, session storage, rate limiting, etc.
+
+```typescript
+import { redis } from "../lib/redis";
+
+await redis.set("key", "value", { EX: 3600 });
+const value = await redis.get("key");
+```
+
+### Client configuration
+
+```1:14:src/lib/redis.ts
+import { createClient } from "redis";
+
+export const redis = createClient({
+  url: process.env.REDIS_URL,
+});
+
+redis.on("error", (err) => {
+  console.error("Redis Error:", err);
+});
+
+(async () => {
+  await redis.connect();
+  console.log("Redis Connected");
+})();
+```
+
+- Connection URL comes from `REDIS_URL`
+- Errors are logged but do not crash the process
+- Connection is lazy-initialized when the module is imported
+
+### Local vs Docker URLs
+
+| Environment | `REDIS_URL` | Why |
+| ----------- | ----------- | --- |
+| Local dev (Redis on host) | `redis://localhost:6379` | Connect to Redis on your machine |
+| Local dev (Redis via Compose) | `redis://localhost:6379` | Port `6379` is published to the host |
+| API inside Docker Compose | `redis://redis:6379` | `redis` is the Docker service name |
+
+> Inside Docker, **never** use `localhost` for Redis or Postgres — `localhost` refers to the container itself, not other services.
+
+### Verify Redis
+
+```bash
+# Local CLI
+redis-cli ping
+# PONG
+
+# Docker
+docker compose exec redis redis-cli ping
+# PONG
+```
+
+---
+
+## Database & Prisma
+
+Schema lives in `prisma/schema.prisma`. Migrations are in `prisma/migrations/`.
+
+### Common commands
+
+| Command | When to use |
+| ------- | ----------- |
+| `npx prisma generate` | After schema changes — regenerates the typed client |
+| `npx prisma migrate dev --name <change>` | Dev: create + apply a migration |
+| `npx prisma migrate deploy` | Prod/Docker: apply pending migrations |
+| `npx prisma migrate status` | Check if DB matches migration history |
+| `npx prisma migrate reset` | **Drops all data** and re-applies migrations |
+| `npx prisma db push` | Quick prototype sync (no migration files) |
+
+### Typical workflow after a schema change
+
+1. Edit `prisma/schema.prisma`
+2. Run `npx prisma migrate dev --name describe_change`
+3. Update services/controllers
+4. Restart the dev server
+
+---
+
+## Running the Project
+
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | Dev server with hot reload (`ts-node-dev`) |
+| `npm run build` | Compile TypeScript → `dist/` |
+| `npm start` | Run production build |
+| `npm run typecheck` | Type-check without emitting files |
+
+### Production (without Docker)
 
 ```bash
 npm run build
 npm start
 ```
 
-## Running with Docker
+> Do **not** commit `dist/` — it is build output. Run `npm run build` after pulling changes or in CI/Docker.
 
-The project ships with a `Dockerfile` and a `docker-compose.yml` that runs both the API and a PostgreSQL database.
+---
 
-### Prerequisites
+## Docker Setup
 
-- **Docker** and **Docker Compose** installed
+The stack runs four services:
 
-### 1. Set the JWT secret
-
-Compose reads `JWT_SECRET` from your shell/`.env`. Add it to `.env` (the database URL is set automatically inside Compose):
-
-```bash
-JWT_SECRET="replace-with-a-long-random-secret"
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐
+│  nginx  │────▶│   api   │────▶│   db    │
+│  :80    │     │  :5001  │     │  :5432  │
+└─────────┘     └────┬────┘     └─────────┘
+                     │
+                     ▼
+               ┌─────────┐
+               │  redis  │
+               │  :6379  │
+               └─────────┘
 ```
 
-> Generate one with: `openssl rand -hex 32`
+| Service | Image | Host port | Purpose |
+| ------- | ----- | --------- | ------- |
+| `db` | `postgres:16-alpine` | 5432 | PostgreSQL database |
+| `redis` | `redis:7-alpine` | 6379 | Redis cache |
+| `api` | Built from `Dockerfile` | 5001 | Express API |
+| `nginx` | `nginx:alpine` | 80 | Reverse proxy → API |
+
+### 1. Configure `.env`
+
+Docker Compose reads secrets from your host `.env`. You need at minimum:
+
+```bash
+JWT_SECRET="<long-random-secret>"
+JWT_REFRESH_SECRET="<another-long-random-secret>"
+```
+
+Compose **overrides** `DATABASE_URL` and `REDIS_URL` inside the `api` container to point at the `db` and `redis` services — you do not need to change those for Docker.
+
+Optional:
+
+```bash
+CLIENT_URL="http://localhost:3000"
+```
 
 ### 2. Build and start
 
@@ -231,156 +277,258 @@ JWT_SECRET="replace-with-a-long-random-secret"
 docker compose up --build
 ```
 
-This will:
-
-- Start a `postgres:16-alpine` container (with a persistent `pgdata` volume)
-- Build the API image, run `prisma db push` to sync the schema, then start the server
-- Expose the API on `http://localhost:5001` and Postgres on `localhost:5432`
-
-Verify it's running:
+Detached mode:
 
 ```bash
+docker compose up --build -d
+```
+
+On startup the `api` service:
+
+1. Waits for `db` and `redis` to be healthy
+2. Runs `npx prisma migrate deploy` (applies committed migrations)
+3. Starts `node dist/server.js`
+
+### 3. Verify
+
+```bash
+# Direct to API
 curl http://localhost:5001/health
-# { "success": true, "message": "Backend running" }
+
+# Through nginx
+curl http://localhost/health
 ```
 
-### Common commands
+### Common Docker commands
 
-| Command                      | Description                              |
-| ---------------------------- | ---------------------------------------- |
-| `docker compose up --build`  | Build and start all services             |
-| `docker compose up -d`       | Start in detached (background) mode      |
-| `docker compose logs -f api` | Tail the API logs                        |
-| `docker compose down`        | Stop and remove containers               |
-| `docker compose down -v`     | Stop and also delete the database volume |
+| Command | Description |
+| ------- | ----------- |
+| `docker compose up --build` | Build images and start all services |
+| `docker compose up db redis -d` | Start only Postgres + Redis (for local `npm run dev`) |
+| `docker compose logs -f api` | Tail API logs |
+| `docker compose ps` | List running services |
+| `docker compose down` | Stop and remove containers |
+| `docker compose down -v` | Stop and **delete database volume** (fresh DB) |
+| `docker compose exec api sh` | Shell into the API container |
+| `docker compose exec redis redis-cli ping` | Test Redis |
 
-### Building the image only
-
-```bash
-docker build -t fitscale-backend .
-docker run -p 5001:5001 --env-file .env fitscale-backend
-```
-
-> When running the container standalone (without Compose), make sure `DATABASE_URL` points to a reachable database — `localhost` inside a container refers to the container itself, not your host.
-
-## Cold Start with Docker (From Scratch)
-
-Use this when you want to bring the entire stack up from nothing — no containers, no database volume, no cached image layers.
-
-### Prerequisites
-
-- **Docker Desktop is running.**
-- The project **compiles** (`npm run typecheck` passes). The Docker image build runs `npm run build` (`tsc`), so any TypeScript error will fail the image build.
-
-### Step 1 — Configure environment variables
-
-Compose reads secrets from `.env`. At minimum you need:
-
-```bash
-# Signs access tokens
-JWT_SECRET="<long-random-secret>"
-
-# Signs refresh tokens (used by the refresh-token flow)
-JWT_REFRESH_SECRET="<another-long-random-secret>"
-```
-
-Generate strong values with `openssl rand -hex 32`.
-
-> `DATABASE_URL` is **not** needed here for Docker — Compose overrides it to point at the `db` service automatically.
-
-### Step 2 — Tear down anything from a previous run
+### Cold start (from scratch)
 
 ```bash
 docker compose down -v
+docker compose up --build
 ```
 
-`-v` also deletes the `pgdata` volume, so the database starts completely empty (a true cold start). Skip `-v` if you want to keep existing data.
+---
 
-### Step 3 — Build the image without cache (optional but thorough)
+## Syncing with Docker
+
+Use this checklist whenever you change code, schema, or configuration.
+
+### After code changes (TypeScript)
+
+The `Dockerfile` compiles TypeScript during the image build. Rebuild the API image:
 
 ```bash
-docker compose build --no-cache
+docker compose up --build api
 ```
 
-### Step 4 — Start the stack
+Or rebuild everything:
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-This will, in order:
+### After Prisma schema changes
 
-1. Start `postgres:16-alpine` and wait until it's healthy
-2. Build/start the API container
-3. Sync the database schema, then run the server
+1. Create a migration locally:
 
-> Add `-d` to run in the background: `docker compose up -d`
+   ```bash
+   npx prisma migrate dev --name your_change
+   ```
 
-### Step 5 — Verify
+2. Commit the new folder under `prisma/migrations/`
+
+3. Restart the API container (runs `migrate deploy` on startup):
+
+   ```bash
+   docker compose up --build api
+   ```
+
+> The `api` service uses `npx prisma migrate deploy`, **not** `db push`. Always commit migration files before deploying.
+
+### After `.env` changes
+
+Compose reads `.env` when containers are **created**. Restart affected services:
 
 ```bash
-curl http://localhost:5001/health
-# { "success": true, "message": "Backend running" }
+docker compose up -d --force-recreate api
 ```
 
-Tail logs if needed:
+### After `docker-compose.yml` changes
 
 ```bash
-docker compose logs -f api
+docker compose down
+docker compose up --build
 ```
 
-### One-liner cold start
+### After `nginx/nginx.conf` changes
+
+Nginx mounts the config as a volume — restart nginx only:
 
 ```bash
-docker compose down -v && docker compose up --build
+docker compose restart nginx
 ```
 
-### Notes
+### After `package.json` dependency changes
 
-- **Migrations vs `db push`:** the `api` service currently runs `npx prisma db push` on startup. Since this project uses migrations (`prisma/migrations/`), change that command in `docker-compose.yml` to `npx prisma migrate deploy` to apply committed migrations instead.
-- **`JWT_REFRESH_SECRET` in Compose:** make sure this variable is also passed to the `api` service's `environment:` block in `docker-compose.yml`, otherwise the refresh-token flow fails at runtime inside the container.
+Rebuild the image (dependencies are installed at build time):
 
-## API Endpoints
+```bash
+docker compose build --no-cache api
+docker compose up -d api
+```
 
-Base URL: `http://localhost:5001`
+### Local dev + Docker dependencies
 
-| Method | Endpoint             | Description                 | Body                             |
-| ------ | -------------------- | --------------------------- | -------------------------------- |
-| `GET`  | `/health`            | Health check                | —                                |
-| `POST` | `/api/auth/register` | Register a new user         | `{ email, password }`            |
-| `POST` | `/api/auth/login`    | Log in, sets `token` cookie | `{ email, password }`            |
-| `POST` | `/api/auth/logout`   | Log out, clears cookie      | —                                |
-| `GET`  | `/api/users`         | List all users              | —                                |
-| `POST` | `/api/users`         | Create a user               | `{ email, passwordHash }`        |
-| `GET`  | `/api/workouts`      | List all workouts           | —                                |
-| `POST` | `/api/workouts`      | Create a workout            | `{ workoutType, count, userId }` |
+Run Postgres and Redis in Docker, API on your machine:
 
-`workoutType` must be one of: `PUSHUP`, `SQUAT`, `SITUP`, `PLANK`.
+```bash
+# Terminal 1 — dependencies only
+docker compose up db redis -d
+
+# Terminal 2 — API locally
+npm run dev
+```
+
+Ensure `.env` uses host URLs:
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
+REDIS_URL="redis://localhost:6379"
+```
+
+---
+
+## API Reference
+
+Base URL: `http://localhost:5001` (or `http://localhost` via nginx)
+
+### Auth (public)
+
+Auth uses **httpOnly cookies** — tokens are not returned in the JSON body.
+
+| Method | Endpoint | Body | Description |
+| ------ | -------- | ---- | ----------- |
+| `POST` | `/api/auth/register` | `{ email, password }` | Register (password min 8 chars) |
+| `POST` | `/api/auth/login` | `{ email, password }` | Login — sets `accessToken` + `refreshToken` cookies |
+| `POST` | `/api/auth/refresh-token` | — | Refresh tokens — requires `refreshToken` cookie |
+| `POST` | `/api/auth/logout` | — | Logout — requires `refreshToken` cookie, clears cookies |
+
+### Users (protected — `accessToken` cookie)
+
+| Method | Endpoint | Access | Body |
+| ------ | -------- | ------ | ---- |
+| `POST` | `/api/users` | — | `{ email, password, role? }` |
+| `GET` | `/api/users` | Admin | — |
+| `GET` | `/api/users/:id` | Owner or admin | — |
+| `PUT` | `/api/users/:id` | Owner or admin | `{ email?, password?, role? }` |
+| `DELETE` | `/api/users/:id` | Owner or admin | — |
+| `DELETE` | `/api/users` | Admin | — |
+
+User responses omit `passwordHash` and `token`.
+
+Roles: `ADMIN`, `TRAINER`, `USER`
+
+### Workouts (protected — `accessToken` cookie)
+
+Scoped to the authenticated user.
+
+| Method | Endpoint | Body |
+| ------ | -------- | ---- |
+| `GET` | `/api/workouts` | — |
+| `POST` | `/api/workouts` | `{ workoutType, count }` |
+
+`workoutType`: `PUSHUP` | `SQUAT` | `SITUP` | `PLANK`  
+`count`: positive integer
+
+### Health
+
+| Method | Endpoint | Description |
+| ------ | -------- | ----------- |
+| `GET` | `/health` | `{ success, message }` |
 
 ### Postman
 
-A ready-to-import Postman collection is included: [`fitscale.postman_collection.json`](./fitscale.postman_collection.json). Import it via **Postman → Import → File**. The login request automatically captures the auth cookie.
+Import [`fitscale.postman_collection.json`](./fitscale.postman_collection.json) via **Postman → Import**.  
+Login first — Postman sends cookies automatically on subsequent requests.
+
+---
 
 ## Project Structure
 
 ```
 src/
-  server.ts            # App entry: middleware, routes, server startup
+  server.ts                          # Entry point — middleware, routes, startup
   lib/
-    prisma.ts          # Prisma client (pg adapter)
+    prisma.ts                        # Prisma client (pg adapter)
+    redis.ts                         # Redis client (connects on import)
+  middleware/
+    authentication.middleware.ts     # JWT cookie verification
+    authorisation.middleware.ts      # Role + owner checks
+    validate.middleware.ts           # Zod request validation
   routes/
-    index.ts           # Mounts module routes under /api
+    index.ts                         # Mounts /auth, /users, /workouts
   modules/
-    auth/              # register / login / logout
-    users/             # user CRUD
-    workouts/          # workout create / list
+    auth/                            # Register, login, refresh, logout
+    users/                           # User CRUD
+    workouts/                        # Workout create / list
+  validators/                        # Zod schemas
+  utils/
+    user.ts                          # Sanitize user objects
+nginx/
+  nginx.conf                         # Reverse proxy config (Docker)
 prisma/
-  schema.prisma        # Database schema (User, Workout, WorkoutType)
+  schema.prisma                      # Database schema
+  migrations/                        # Versioned SQL migrations
+docker-compose.yml                   # Multi-service stack
+Dockerfile                           # Multi-stage API image
 ```
+
+---
 
 ## Troubleshooting
 
-- **`secretOrPrivateKey must have a value`** — `JWT_SECRET` is missing from `.env`. Add it and restart the server (`.env` changes don't auto-reload).
-- **`HTTP 403` on `localhost:5000` (macOS)** — AirPlay Receiver owns port 5000. Use `PORT=5001` or disable AirPlay Receiver in System Settings → General → AirDrop & Handoff.
-- **`EADDRINUSE`** — the port is already in use: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)`.
-- **Prisma can't connect** — confirm PostgreSQL is running and `DATABASE_URL` is correct, then re-run `npx prisma db push`.
+| Problem | Fix |
+| ------- | --- |
+| `secretOrPrivateKey must have a value` | Set `JWT_SECRET` and `JWT_REFRESH_SECRET` in `.env`, restart |
+| `Redis Error: ECONNREFUSED` | Start Redis (`docker compose up redis -d` or `brew services start redis`). Check `REDIS_URL` |
+| `Redis Connected` never appears | Ensure `import "./lib/redis"` is in `server.ts` |
+| Prisma can't connect locally | Confirm Postgres is running; verify `DATABASE_URL` |
+| Prisma can't connect in Docker | Use service name `db`, not `localhost`, in Compose env |
+| Cookies not sent from browser | Set `CLIENT_URL` to your frontend origin; CORS does not allow `*` with credentials |
+| Cookies not stored on localhost | `Secure` cookies only apply when `NODE_ENV=production` |
+| `HTTP 403` on port 5000 (macOS) | Use `PORT=5001` or disable AirPlay Receiver |
+| `EADDRINUSE` | Port in use: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` |
+| Docker API fails on startup | Check logs: `docker compose logs api`. Often missing JWT secrets or migration failure |
+| nginx returns 502 | API not ready — `docker compose logs api`. Confirm `proxy_pass http://api:5001` in `nginx/nginx.conf` |
+| Schema out of sync in Docker | Run `docker compose exec api npx prisma migrate deploy` or rebuild with committed migrations |
+| TypeScript build fails in Docker | Run `npm run typecheck` locally first — Docker runs `npm run build` |
+
+---
+
+## Quick Reference
+
+```bash
+# Full local setup
+npm install
+docker compose up db redis -d
+npx prisma migrate dev
+npm run dev
+
+# Full Docker stack
+docker compose up --build
+
+# Reset Docker database
+docker compose down -v && docker compose up --build
+```

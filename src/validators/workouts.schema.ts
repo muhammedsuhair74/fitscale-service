@@ -7,3 +7,7 @@ export const createWorkoutSchema = z.object({
   }),
   count: z.number().int().positive("Count must be a positive integer"),
 });
+
+export const workoutIdParamSchema = z.object({
+  id: z.string().uuid("Invalid workout id"),
+});

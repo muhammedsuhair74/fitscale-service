@@ -6,6 +6,8 @@ import {
   getUserByIdService,
   findUserByEmail,
   updateUserByIdService,
+  deleteUserByIdService,
+  deleteAllUsersService,
 } from "./users.service";
 import { hash } from "bcrypt";
 import { sanitizeUser, sanitizeUsers } from "../../utils/user";
@@ -107,6 +109,42 @@ export const updateUserByIdController = async (
       user: sanitizeUser(user),
       success: true,
       message: "User updated successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const deleteUserByIdController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    await deleteUserByIdService(req.params.id as string);
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const deleteAllUsersController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    await deleteAllUsersService();
+    res.status(200).json({
+      success: true,
+      message: "All users deleted successfully",
     });
   } catch (error) {
     res.status(400).json({

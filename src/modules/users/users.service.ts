@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma";
 import { User, UserRoles } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { redis } from "../../lib/redis";
+import { cacheKeys, WORKOUT_CACHE_TTL_SECONDS } from "../../constants";
 
 export const createUserService = async (
   email: string,
@@ -14,23 +16,37 @@ export const createUserService = async (
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
-    return await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         ...(role !== undefined && { role }),
       },
     });
+    await redis.del(cacheKeys.allUsers);
+    return user;
   } catch {
     throw new Error("Failed to create user with this email");
   }
 };
 
 export const getUsersService = async (): Promise<User[]> => {
+  const cachedData = await redis.get(cacheKeys.allUsers);
+  if (cachedData) {
+    console.log("Redis Hit");
+    return JSON.parse(cachedData) as User[];
+  }
+
+  console.log("Redis Miss");
+
   try {
-    return await prisma.user.findMany({
+    const data = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
     });
+    await redis.set(cacheKeys.allUsers, JSON.stringify(data), {
+      EX: WORKOUT_CACHE_TTL_SECONDS,
+    });
+    return data;
   } catch {
     throw new Error("Failed to get users");
   }
@@ -72,7 +88,7 @@ export const updateUserByIdService = async ({
   role?: UserRoles;
 }): Promise<User> => {
   try {
-    return await prisma.user.update({
+    const user = await prisma.user.update({
       where: { id },
       data: {
         ...(email !== undefined && { email }),
@@ -80,7 +96,35 @@ export const updateUserByIdService = async ({
         ...(role !== undefined && { role }),
       },
     });
+    await redis.del(cacheKeys.allUsers);
+    return user;
   } catch {
     throw new Error("Failed to update user by id");
+  }
+};
+
+export const deleteUserByIdService = async (id: string): Promise<void> => {
+  try {
+    await prisma.user.delete({
+      where: { id },
+    });
+    await redis.del(cacheKeys.allUsers);
+  } catch {
+    throw new Error("Failed to delete user by id");
+  }
+};
+
+export const deleteAllUsersService = async (): Promise<void> => {
+  try {
+    await prisma.user.deleteMany({
+      where: {
+        role: {
+          not: UserRoles.ADMIN,
+        },
+      },
+    });
+    await redis.del(cacheKeys.allUsers);
+  } catch {
+    throw new Error("Failed to delete all users");
   }
 };

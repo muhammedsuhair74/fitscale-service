@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Fitscale Backend API",
-    "description": "API collection for the Fitscale backend.\n\n- Auth uses httpOnly cookies (`accessToken`, `refreshToken`). Log in first; Postman sends cookies automatically on later requests.\n- Protected routes (Users, Workouts) require a valid `accessToken` cookie.",
+    "description": "API collection for the Fitscale backend.\n\n## Auth\n- Uses httpOnly cookies (`accessToken`, `refreshToken`). Log in first; Postman sends cookies automatically on later requests to the same host.\n- Tokens are **not** returned in the JSON body — only a sanitized user object (`passwordHash` and `token` are omitted).\n- Refresh and logout identify the user from the `refreshToken` cookie — no email in the request body.\n- Cookies use `Secure` only when `NODE_ENV=production`.\n\n## Protected routes\n- `/api/users` and `/api/workouts` require a valid `accessToken` cookie.\n\n## User roles\n- `ADMIN` — list/create/delete all users\n- Owner or `ADMIN` — get/update/delete a user by `:id`\n- Any authenticated user — own workouts only\n\n## Validation\n- Register/create password: min 8 characters\n- User `:id` must be a UUID\n- Workout `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- Workout `count`: positive integer",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -9,8 +9,7 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:5001", "type": "string" },
-    { "key": "accessToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" }
+    { "key": "userId", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -24,12 +23,13 @@
           "host": ["{{baseUrl}}"],
           "path": ["health"]
         },
-        "description": "Health check. Returns { success, message }."
+        "description": "Health check.\n\n**Response 200:** `{ success: true, message: \"Backend running\" }`"
       },
       "response": []
     },
     {
       "name": "Auth",
+      "description": "Public auth routes. Login and refresh set httpOnly cookies.",
       "item": [
         {
           "name": "Register",
@@ -46,7 +46,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "register"]
             },
-            "description": "Registers a new user. Body: { email, password }. Returns 201 with the created user."
+            "description": "Registers a new user (role defaults to USER).\n\n**Body:** `{ email, password }` — password min 8 chars\n\n**Response 201:** `{ user, success, message }` — user is sanitized (no passwordHash/token)\n\n**Response 400:** validation or duplicate email error"
           },
           "response": []
         },
@@ -58,13 +58,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// Capture the auth cookies set by the login response into collection variables.",
-                  "const accessToken = pm.cookies.get('accessToken');",
-                  "const refreshToken = pm.cookies.get('refreshToken');",
-                  "if (accessToken) pm.collectionVariables.set('accessToken', accessToken);",
-                  "if (refreshToken) pm.collectionVariables.set('refreshToken', refreshToken);",
-                  "if (!accessToken) {",
-                  "    console.warn('No accessToken cookie captured. The server sets cookies with Secure=true, which are not stored over http://localhost. See the README/notes.');",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.user?.id) {",
+                  "        pm.collectionVariables.set('userId', json.user.id);",
+                  "    }",
+                  "    const accessToken = pm.cookies.get('accessToken');",
+                  "    const refreshToken = pm.cookies.get('refreshToken');",
+                  "    pm.test('accessToken cookie set', () => pm.expect(accessToken).to.be.a('string'));",
+                  "    pm.test('refreshToken cookie set', () => pm.expect(refreshToken).to.be.a('string'));",
                   "}"
                 ]
               }
@@ -83,12 +85,26 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "login"]
             },
-            "description": "Logs in a user. Body: { email, password }. On success sets httpOnly `accessToken` (1h) and `refreshToken` (7d) cookies and returns the user."
+            "description": "Logs in a user.\n\n**Body:** `{ email, password }`\n\n**Sets cookies:** `accessToken` (1h), `refreshToken` (7d)\n\n**Response 200:** `{ user, success, message }` — no tokens in body\n\n**Response 401:** invalid credentials"
           },
           "response": []
         },
         {
           "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('accessToken cookie refreshed', () => pm.expect(pm.cookies.get('accessToken')).to.be.a('string'));",
+                  "    pm.test('refreshToken cookie refreshed', () => pm.expect(pm.cookies.get('refreshToken')).to.be.a('string'));",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -98,12 +114,28 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "refresh-token"]
             },
-            "description": "Issues new tokens. Requires a valid `refreshToken` cookie (set by Login). No request body needed."
+            "description": "Issues new tokens using the `refreshToken` cookie. No request body.\n\n**Requires:** valid `refreshToken` cookie (from Login)\n\n**Sets cookies:** new `accessToken` and `refreshToken`\n\n**Response 200:** `{ user, success, message }`\n\n**Response 401:** missing, invalid, or revoked refresh token"
           },
           "response": []
         },
         {
           "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('cookies cleared', () => {",
+                  "        pm.expect(pm.cookies.get('accessToken')).to.be.undefined;",
+                  "        pm.expect(pm.cookies.get('refreshToken')).to.be.undefined;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -113,7 +145,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "auth", "logout"]
             },
-            "description": "Logs out the current user and clears the `accessToken` / `refreshToken` cookies."
+            "description": "Logs out the current user.\n\n**Requires:** valid `refreshToken` cookie\n\n**Clears cookies:** `accessToken`, `refreshToken`\n\n**Invalidates** stored refresh token in DB\n\n**Response 200:** `{ success, message }`\n\n**Response 401:** missing or invalid refresh token"
           },
           "response": []
         }
@@ -121,7 +153,7 @@
     },
     {
       "name": "Users",
-      "description": "Protected routes. Require a valid `accessToken` cookie (set by Login).",
+      "description": "Protected routes. Require `accessToken` cookie.\n\n- Admin only: list all, create, delete all\n- Owner or admin: get/update/delete by `:id`",
       "item": [
         {
           "name": "Create User",
@@ -137,7 +169,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users"]
             },
-            "description": "Creates a user (admin only). Body: { email, password, role? }."
+            "description": "Creates a user. **Admin only.**\n\n**Body:** `{ email, password, role? }` — role: ADMIN | TRAINER | USER (defaults to USER)\n\n**Response 201:** `{ user, success, message }`"
           },
           "response": []
         },
@@ -151,7 +183,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users"]
             },
-            "description": "Returns all users ordered by createdAt desc."
+            "description": "Returns all users ordered by `createdAt` desc. **Admin only.**\n\n**Response 200:** `{ users, success, message }` — users are sanitized"
           },
           "response": []
         },
@@ -161,12 +193,57 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/users/:id",
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "users", ":id"],
-              "variable": [{ "key": "id", "value": "<user-uuid>" }]
+              "path": ["api", "users", "{{userId}}"]
             },
-            "description": "Returns a single user by id."
+            "description": "Returns a single user. **Owner or admin.**\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin\n\n**Response 404:** user not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User by ID",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"updated@example.com\",\n  \"password\": \"NewPassword123!\",\n  \"role\": \"USER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Updates a user. **Owner or admin.** All body fields are optional.\n\n**Body:** `{ email?, password?, role? }` — password min 8 chars if provided\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            },
+            "description": "Deletes a user. **Owner or admin.**\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ success, message }`\n\n**Response 403:** not owner and not admin"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete All Users",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Deletes all users. **Admin only.**\n\n**Response 200:** `{ success, message }`"
           },
           "response": []
         }
@@ -174,7 +251,7 @@
     },
     {
       "name": "Workouts",
-      "description": "Protected routes. Require a valid `accessToken` cookie (set by Login).",
+      "description": "Protected routes. Require `accessToken` cookie. Workouts are scoped to the authenticated user.",
       "item": [
         {
           "name": "Create Workout",
@@ -190,7 +267,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "workouts"]
             },
-            "description": "Creates a workout for the authenticated user. Body: { workoutType, count }. workoutType: PUSHUP, SQUAT, SITUP, or PLANK."
+            "description": "Creates a workout for the authenticated user.\n\n**Body:** `{ workoutType, count }`\n- `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- `count`: positive integer\n\n**Response 201:** `{ workout, success, message }`"
           },
           "response": []
         },
@@ -204,7 +281,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "workouts"]
             },
-            "description": "Returns all workouts ordered by createdAt desc."
+            "description": "Returns workouts for the authenticated user, ordered by `createdAt` desc.\n\n**Response 200:** `{ workouts, success, message }`"
           },
           "response": []
         }

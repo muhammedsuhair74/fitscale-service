@@ -16,22 +16,46 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      # Overrides any DATABASE_URL in .env so it points at the db service
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/fitscale?schema=public"
+      REDIS_URL: "redis://redis:6379"
       PORT: "5001"
       NODE_ENV: production
       JWT_SECRET: "${JWT_SECRET:-change-me-in-env}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-change-me-in-env}"
+      CLIENT_URL: "${CLIENT_URL:-http://localhost:3000}"
     ports:
       - "5001:5001"
-    # Sync the schema, then start the server
-    command: sh -c "npx prisma db push && node dist/server.js"
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
 
 volumes:
   pgdata:

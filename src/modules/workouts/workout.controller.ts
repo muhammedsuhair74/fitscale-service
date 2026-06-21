@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import { createWorkoutService, getWorkoutsService } from "./workout.service";
+import {
+  createWorkoutService,
+  getWorkoutByIdService,
+  getWorkoutsService,
+} from "./workout.service";
 
 type AuthUser = {
   userId: string;
@@ -40,6 +44,27 @@ export const getWorkoutsController = async (
     });
   } catch (error) {
     res.status(400).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const getWorkoutByIdController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { userId } = (req as Request & { user: AuthUser }).user;
+    const { id } = req.params;
+    const workout = await getWorkoutByIdService(userId, id as string);
+    res.status(200).json({
+      workout,
+      success: true,
+      message: "Workout fetched successfully",
+    });
+  } catch (error) {
+    res.status(404).json({
       message: (error as Error).message,
       success: false,
     });

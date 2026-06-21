@@ -5,6 +5,8 @@ import {
   getUsersController,
   getUserByIdController,
   updateUserByIdController,
+  deleteUserByIdController,
+  deleteAllUsersController,
 } from "./users.controllers";
 import {
   authorisationMiddleware,
@@ -19,32 +21,45 @@ import {
   updateUserSchema,
   userIdParamSchema,
 } from "../../validators/users.schema";
+import { authMiddleware } from "../../middleware/authentication.middleware";
 
 const usersRoutes = Router();
 
-usersRoutes.post(
-  "/",
-  authorisationMiddleware(UserRoles.ADMIN),
-  validateBody(createUserSchema),
-  createUserController,
-);
+usersRoutes.post("/", validateBody(createUserSchema), createUserController);
 usersRoutes.get(
   "/",
+  authMiddleware,
   authorisationMiddleware(UserRoles.ADMIN),
   getUsersController,
 );
 usersRoutes.get(
   "/:id",
   validateParams(userIdParamSchema),
+  authMiddleware,
   ownerOrAdminMiddleware,
   getUserByIdController,
 );
 usersRoutes.put(
   "/:id",
   validateParams(userIdParamSchema),
+  authMiddleware,
   ownerOrAdminMiddleware,
   validateBody(updateUserSchema),
   updateUserByIdController,
 );
 
+usersRoutes.delete(
+  "/:id",
+  validateParams(userIdParamSchema),
+  authMiddleware,
+  ownerOrAdminMiddleware,
+  deleteUserByIdController,
+);
 export default usersRoutes;
+
+usersRoutes.delete(
+  "/",
+  authMiddleware,
+  authorisationMiddleware(UserRoles.ADMIN),
+  deleteAllUsersController,
+);
