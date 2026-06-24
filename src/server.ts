@@ -7,12 +7,16 @@ import cookieParser from "cookie-parser";
 
 import "./lib/redis";
 import router from "./routes/index";
+import { performanceLogger } from "./middleware/performance.middleware";
+import { connectRabbit } from "./lib/rabbitmq";
 
 const app = express();
 app.use(helmet());
 
 const clientOrigin = process.env.CLIENT_URL ?? "http://localhost:3000";
 
+app.use(performanceLogger);
+connectRabbit();
 app.use(
   cors({
     origin: clientOrigin,
