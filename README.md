@@ -1,6 +1,6 @@
 # Fitscale Backend
 
-REST API for Fitscale — user auth, user management, and workout tracking. Built with **Express 5**, **TypeScript**, **Prisma** (PostgreSQL), and **Redis**.
+REST API for Fitscale — user auth, user management, workout tracking, and badge processing. Built with **Express 5**, **TypeScript**, **Prisma** (PostgreSQL), **Redis**, and **RabbitMQ**.
 
 ## Tech Stack
 
@@ -10,7 +10,8 @@ REST API for Fitscale — user auth, user management, and workout tracking. Buil
 | Framework | Express 5 |
 | Language | TypeScript |
 | Database | PostgreSQL 16 (Prisma ORM + `@prisma/adapter-pg`) |
-| Cache / sessions | Redis 7 (`redis` npm package) |
+| Cache | Redis 7 (`redis` npm package) |
+| Message queue | RabbitMQ 3 (`amqplib`) — workout events for badge workers |
 | Auth | JWT in httpOnly cookies, bcrypt password hashing |
 | Validation | Zod |
 | Reverse proxy | Nginx (Docker only) |
@@ -23,7 +24,8 @@ REST API for Fitscale — user auth, user management, and workout tracking. Buil
 - **Node.js** >= 20 LTS
 - **PostgreSQL** >= 14 (local or Docker)
 - **Redis** >= 7 (local or Docker)
-- **Docker + Docker Compose** (optional, for containerized setup)
+- **RabbitMQ** >= 3 (local or Docker)
+- **Docker + Docker Compose** (recommended — easiest way to run Postgres, Redis, and RabbitMQ together)
 
 ---
 
@@ -80,26 +82,41 @@ openssl rand -hex 32
 npm install
 ```
 
-### 2. Start PostgreSQL and Redis
+### 2. Start dependencies (Postgres, Redis, RabbitMQ)
 
-**Option A — Docker (recommended for dependencies only):**
+The API connects to **all three** on startup. If Redis or RabbitMQ is not running, `npm run dev` will fail with a connection error (`AggregateError` / `ECONNREFUSED`).
+
+**Option A — Docker (recommended):**
 
 ```bash
-docker compose up db redis -d
+docker compose up db redis rabbitmq -d
+```
+
+That is all you need — no separate install or manual startup for each service. Compose pulls the images (first run only), starts the containers, and publishes ports to your machine.
+
+Verify they are up:
+
+```bash
+docker compose ps
+# db, redis, and rabbitmq should show "Up" (redis also "healthy")
 ```
 
 **Option B — Install locally:**
 
 - Postgres: `brew install postgresql@16` (macOS) or your OS package manager
 - Redis: `brew install redis && brew services start redis` (macOS)
+- RabbitMQ: `brew install rabbitmq && brew services start rabbitmq` (macOS)
+
+If you install locally, RabbitMQ must listen on **port 5672** (the default) to match the app.
 
 ### 3. Configure `.env`
 
-Use the template above. For Docker-backed dependencies:
+Use the template above. For Docker-backed dependencies, point at the **host** ports Compose publishes:
 
 ```bash
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
 REDIS_URL="redis://localhost:6379"
+# RabbitMQ URL is currently hardcoded in src/lib/rabbitmq.ts as amqp://guest:guest@localhost:5672
 ```
 
 ### 4. Sync the database
@@ -122,7 +139,14 @@ curl http://localhost:5001/health
 # {"success":true,"message":"Backend running"}
 ```
 
-You should also see `Redis Connected` in the server logs.
+You should also see both of these in the server logs:
+
+```
+Redis Connected
+RabbitMQ Connected
+```
+
+If either line is missing, the matching service is not running or is on the wrong port.
 
 ---
 
@@ -184,6 +208,75 @@ docker compose exec redis redis-cli ping
 # PONG
 ```
 
+### Do I need to start Redis manually?
+
+| How you run the API | What to do |
+| ------------------- | ---------- |
+| `npm run dev` (local) | Start Redis first: `docker compose up redis -d` (or run Redis locally) |
+| `docker compose up` (full stack) | Redis starts automatically with the stack |
+
+Redis has a healthcheck in Compose. The `api` service waits for Redis to be healthy before starting.
+
+---
+
+## RabbitMQ
+
+### What RabbitMQ is used for
+
+RabbitMQ handles async workout events. When a workout is created, the API publishes a message to the `workout-created` queue. Badge workers consume that queue to award badges.
+
+- Client: `src/lib/rabbitmq.ts`
+- Producer: `src/modules/workouts/workout.producer.ts`
+- Consumer: `src/modules/badge/workers/badge.worker.ts`
+
+On startup, `connectRabbit()` in `src/server.ts` connects and asserts the `workout-created` queue.
+
+### Connection details
+
+| Setting | Value |
+| ------- | ----- |
+| AMQP URL (local dev) | `amqp://guest:guest@localhost:5672` |
+| AMQP port (host) | `5672` |
+| Management UI | [http://localhost:15672](http://localhost:15672) |
+| Default credentials | `guest` / `guest` |
+
+> The connection URL is currently hardcoded in `src/lib/rabbitmq.ts`. When running the API locally with Docker-backed RabbitMQ, ensure Compose maps **`5672:5672`** (the default in `docker-compose.yml`).
+
+### Local vs Docker URLs
+
+| Environment | How the API reaches RabbitMQ |
+| ----------- | ------------------------------ |
+| Local dev (`npm run dev`) | `localhost:5672` — Compose publishes port `5672` to the host |
+| API inside Docker Compose | `localhost:5672` inside the container **will not work** — use the service name `rabbitmq` (requires a code/env change; local dev is the supported path today) |
+
+### Verify RabbitMQ
+
+```bash
+# Check the port is open
+nc -zv localhost 5672
+
+# Docker — list queues (after at least one API startup)
+docker compose exec rabbitmq rabbitmqctl list_queues
+
+# Management UI — open in browser
+open http://localhost:15672   # macOS
+# Log in with guest / guest
+```
+
+### Do I need to start RabbitMQ manually?
+
+| How you run the API | What to do |
+| ------------------- | ---------- |
+| `npm run dev` (local) | Start RabbitMQ first: `docker compose up rabbitmq -d` (or run RabbitMQ locally) |
+| `docker compose up` (full stack) | RabbitMQ starts with the stack, but the API still connects via `localhost:5672` today — prefer **local API + Docker dependencies** for development |
+
+**Recommended local dev command** (starts all backing services in one go):
+
+```bash
+docker compose up db redis rabbitmq -d
+npm run dev
+```
+
 ---
 
 ## Database & Prisma
@@ -232,7 +325,7 @@ npm start
 
 ## Docker Setup
 
-The stack runs four services:
+The stack runs six services:
 
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────┐
@@ -240,17 +333,20 @@ The stack runs four services:
 │  :80    │     │  :5001  │     │  :5432  │
 └─────────┘     └────┬────┘     └─────────┘
                      │
-                     ▼
-               ┌─────────┐
-               │  redis  │
-               │  :6379  │
-               └─────────┘
+           ┌─────────┴─────────┐
+           ▼                   ▼
+     ┌─────────┐         ┌───────────┐
+     │  redis  │         │ rabbitmq  │
+     │  :6379  │         │ :5672     │
+     └─────────┘         │ :15672 UI │
+                         └───────────┘
 ```
 
 | Service | Image | Host port | Purpose |
 | ------- | ----- | --------- | ------- |
 | `db` | `postgres:16-alpine` | 5432 | PostgreSQL database |
 | `redis` | `redis:7-alpine` | 6379 | Redis cache |
+| `rabbitmq` | `rabbitmq:3-management` | 5672, 15672 | Message queue + management UI |
 | `api` | Built from `Dockerfile` | 5001 | Express API |
 | `nginx` | `nginx:alpine` | 80 | Reverse proxy → API |
 
@@ -304,7 +400,9 @@ curl http://localhost/health
 | Command | Description |
 | ------- | ----------- |
 | `docker compose up --build` | Build images and start all services |
-| `docker compose up db redis -d` | Start only Postgres + Redis (for local `npm run dev`) |
+| `docker compose up db redis rabbitmq -d` | Start only dependencies (for local `npm run dev`) |
+| `docker compose up redis -d` | Start only Redis |
+| `docker compose up rabbitmq -d` | Start only RabbitMQ |
 | `docker compose logs -f api` | Tail API logs |
 | `docker compose ps` | List running services |
 | `docker compose down` | Stop and remove containers |
@@ -391,11 +489,11 @@ docker compose up -d api
 
 ### Local dev + Docker dependencies
 
-Run Postgres and Redis in Docker, API on your machine:
+Run Postgres, Redis, and RabbitMQ in Docker; run the API on your machine:
 
 ```bash
-# Terminal 1 — dependencies only
-docker compose up db redis -d
+# Terminal 1 — dependencies only (one command starts all three)
+docker compose up db redis rabbitmq -d
 
 # Terminal 2 — API locally
 npm run dev
@@ -406,6 +504,14 @@ Ensure `.env` uses host URLs:
 ```bash
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
 REDIS_URL="redis://localhost:6379"
+```
+
+You do **not** need to run `docker run redis` or `docker run rabbitmq` separately — always use `docker compose up` for this project. Container names like `fitscale-backend-redis-1` are created by Compose; they are not image names.
+
+Stop dependencies when done:
+
+```bash
+docker compose stop db redis rabbitmq
 ```
 
 ---
@@ -473,6 +579,7 @@ src/
   lib/
     prisma.ts                        # Prisma client (pg adapter)
     redis.ts                         # Redis client (connects on import)
+    rabbitmq.ts                      # RabbitMQ connection + queue setup
   middleware/
     authentication.middleware.ts     # JWT cookie verification
     authorisation.middleware.ts      # Role + owner checks
@@ -482,7 +589,8 @@ src/
   modules/
     auth/                            # Register, login, refresh, logout
     users/                           # User CRUD
-    workouts/                        # Workout create / list
+    workouts/                        # Workout create / list + queue producer
+    badge/                           # Badge routes + RabbitMQ consumer worker
   validators/                        # Zod schemas
   utils/
     user.ts                          # Sanitize user objects
@@ -502,14 +610,18 @@ Dockerfile                           # Multi-stage API image
 | Problem | Fix |
 | ------- | --- |
 | `secretOrPrivateKey must have a value` | Set `JWT_SECRET` and `JWT_REFRESH_SECRET` in `.env`, restart |
-| `Redis Error: ECONNREFUSED` | Start Redis (`docker compose up redis -d` or `brew services start redis`). Check `REDIS_URL` |
-| `Redis Connected` never appears | Ensure `import "./lib/redis"` is in `server.ts` |
+| `Redis Error: ECONNREFUSED` | Start Redis: `docker compose up redis -d`. Check `REDIS_URL=redis://localhost:6379` |
+| `Redis Connected` never appears | Ensure `import "./lib/redis"` is in `server.ts` and Redis is running |
+| `AggregateError` right after `Server running on 5001` | RabbitMQ is not running or wrong port. Run `docker compose up rabbitmq -d` and confirm port **5672** (`nc -zv localhost 5672`) |
+| `RabbitMQ Connected` never appears | Start RabbitMQ before `npm run dev`. Check `docker compose ps` |
+| RabbitMQ port conflict on `5672` | Something else is using 5672: `lsof -i :5672`. Stop that process or change the host port in `docker-compose.yml` **and** update `src/lib/rabbitmq.ts` to match |
+| `docker run fitscale-backend-redis-1` fails | That is a container name, not an image. Use `docker compose up redis -d` instead |
+| `EADDRINUSE` on port 5001 | Another process (often a previous `npm run dev`) is using the port: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` or use a different `PORT` in `.env` |
 | Prisma can't connect locally | Confirm Postgres is running; verify `DATABASE_URL` |
 | Prisma can't connect in Docker | Use service name `db`, not `localhost`, in Compose env |
 | Cookies not sent from browser | Set `CLIENT_URL` to your frontend origin; CORS does not allow `*` with credentials |
 | Cookies not stored on localhost | `Secure` cookies only apply when `NODE_ENV=production` |
 | `HTTP 403` on port 5000 (macOS) | Use `PORT=5001` or disable AirPlay Receiver |
-| `EADDRINUSE` | Port in use: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` |
 | Docker API fails on startup | Check logs: `docker compose logs api`. Often missing JWT secrets or migration failure |
 | nginx returns 502 | API not ready — `docker compose logs api`. Confirm `proxy_pass http://api:5001` in `nginx/nginx.conf` |
 | Schema out of sync in Docker | Run `docker compose exec api npx prisma migrate deploy` or rebuild with committed migrations |
@@ -522,9 +634,10 @@ Dockerfile                           # Multi-stage API image
 ```bash
 # Full local setup
 npm install
-docker compose up db redis -d
+docker compose up db redis rabbitmq -d
 npx prisma migrate dev
 npm run dev
+# Expect: "Redis Connected" and "RabbitMQ Connected" in logs
 
 # Full Docker stack
 docker compose up --build

@@ -24,6 +24,24 @@ enum WorkoutType {
   PLANK
 }
 
+enum BadgeType {
+  BRONZE_PUSHUP
+  SILVER_PUSHUP
+  GOLD_PUSHUP
+
+  BRONZE_SQUAT
+  SILVER_SQUAT
+  GOLD_SQUAT
+
+  BRONZE_SITUP
+  SILVER_SITUP
+  GOLD_SITUP
+
+  BRONZE_PLANK
+  SILVER_PLANK
+  GOLD_PLANK
+}
+
 model User {
   id String @id @default(uuid())
   email String @unique
@@ -33,6 +51,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   workouts Workout[]
+  badges Badge[]
 }
 
 model Workout {
@@ -46,4 +65,24 @@ model Workout {
 
   @@index([userId, createdAt])
   @@index([userId, workoutType, createdAt])
+}
+
+model Badge {
+  id Int @id @default(autoincrement())
+  userId String
+  badgeType BadgeType
+  awardedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, badgeType])
+}
+
+model TotalWorkouts {
+  id Int @id @default(autoincrement())
+  userId String
+  workoutType WorkoutType
+  totalCount Int
+
+  @@unique([userId, workoutType])
 }
