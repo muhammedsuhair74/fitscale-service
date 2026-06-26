@@ -1,16 +1,26 @@
 import { getChannel } from "../../../lib/rabbitmq";
-import { evaluatePushupBadges } from "../badge.controller";
+import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "../../../constants";
+import { handleBadgeWorkoutEvent } from "../badge.controller";
 
-export async function startBadgeWorker() {
+export function startBadgeWorker() {
   const channel = getChannel();
 
-  channel.consume("workout-created", async (message) => {
+  channel.consume(RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION, async (message) => {
     if (!message) return;
 
-    const payload = JSON.parse(message.content.toString());
+    try {
+      const payload = JSON.parse(
+        message.content.toString(),
+      ) as WorkoutEventPayload;
 
-    await evaluatePushupBadges(payload.userId);
-
-    channel.ack(message);
+      console.log("Badge worker:", payload.event, payload);
+      await handleBadgeWorkoutEvent(payload);
+      channel.ack(message);
+    } catch (error) {
+      console.error("Badge worker error:", error);
+      channel.nack(message, false, true);
+    }
   });
+
+  console.log("Badge worker started");
 }

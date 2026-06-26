@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Fitscale Backend API",
-    "description": "API collection for the Fitscale backend.\n\n## Auth\n- Uses httpOnly cookies (`accessToken`, `refreshToken`). Log in first; Postman sends cookies automatically on later requests to the same host.\n- Tokens are **not** returned in the JSON body — only a sanitized user object (`passwordHash` and `token` are omitted).\n- Refresh and logout identify the user from the `refreshToken` cookie — no email in the request body.\n- Cookies use `Secure` only when `NODE_ENV=production`.\n\n## Protected routes\n- `/api/users` and `/api/workouts` require a valid `accessToken` cookie.\n\n## User roles\n- `ADMIN` — list/create/delete all users\n- Owner or `ADMIN` — get/update/delete a user by `:id`\n- Any authenticated user — own workouts only\n\n## Validation\n- Register/create password: min 8 characters\n- User `:id` must be a UUID\n- Workout `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- Workout `count`: positive integer",
+    "description": "API collection for the Fitscale backend.\n\n## Auth\n- Uses httpOnly cookies (`accessToken`, `refreshToken`). Log in first; Postman sends cookies automatically on later requests to the same host.\n- Tokens are **not** returned in the JSON body — only a sanitized user object (`passwordHash` and `token` are omitted).\n- Refresh and logout identify the user from the `refreshToken` cookie — no email in the request body.\n- Cookies use `Secure` only when `NODE_ENV=production`.\n\n## Protected routes\n- `/api/workouts` and `/api/total-workouts` require a valid `accessToken` cookie on all routes.\n- `/api/users` — most routes require auth; `POST /api/users` (register-style create) is public unless middleware is added later.\n\n## User roles\n- `ADMIN` — list/delete all users; list all total-workout records via `/api/total-workouts/all`\n- Owner or `ADMIN` — get/update/delete a user by `:id`\n- Any authenticated user — own workouts and total-workout records only\n\n## Workouts & totals\n- **Create workout** — syncs `TotalWorkouts` inline and publishes `workout-created` to RabbitMQ (`{ workoutId, userId, workoutType }`). The total-workouts consumer also syncs from the queue.\n- **Update workout** — syncs `TotalWorkouts` inline (both old and new type if changed) and publishes `workout-updated` to RabbitMQ.\n- `TotalWorkouts` stores one row per `(userId, workoutType)` with aggregated `totalCount`.\n\n## RabbitMQ queues\n- `workout-created` — published on workout create\n- `workout-updated` — published on workout update\n\n## Validation\n- Register/create password: min 8 characters\n- User `:id` must be a UUID\n- Workout `:id` must be a UUID\n- Total workout `:id` must be a positive integer\n- Workout `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- Workout `count`: positive integer\n- Total workout `totalCount`: non-negative integer\n\n## Base URL\n- Default `{{baseUrl}}` is `http://localhost:5001`. Change the collection variable if your `PORT` in `.env` differs (e.g. `5002`).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -9,7 +9,9 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:5001", "type": "string" },
-    { "key": "userId", "value": "", "type": "string" }
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "workoutId", "value": "", "type": "string" },
+    { "key": "totalWorkoutId", "value": "1", "type": "string" }
   ],
   "item": [
     {
@@ -153,7 +155,7 @@
     },
     {
       "name": "Users",
-      "description": "Protected routes. Require `accessToken` cookie.\n\n- Admin only: list all, create, delete all\n- Owner or admin: get/update/delete by `:id`",
+      "description": "User management routes.\n\n- `POST /` — create user (no auth middleware on route today)\n- Admin only: list all, delete all\n- Owner or admin: get/update/delete by `:id`",
       "item": [
         {
           "name": "Create User",
@@ -169,7 +171,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users"]
             },
-            "description": "Creates a user. **Admin only.**\n\n**Body:** `{ email, password, role? }` — role: ADMIN | TRAINER | USER (defaults to USER)\n\n**Response 201:** `{ user, success, message }`"
+            "description": "Creates a user.\n\n**Body:** `{ email, password, role? }` — role: ADMIN | TRAINER | USER (defaults to USER)\n\n**Response 201:** `{ user, success, message }`"
           },
           "response": []
         },
@@ -183,7 +185,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users"]
             },
-            "description": "Returns all users ordered by `createdAt` desc. **Admin only.**\n\n**Response 200:** `{ users, success, message }` — users are sanitized"
+            "description": "Returns all users ordered by `createdAt` desc. **Admin only.** Requires `accessToken` cookie.\n\n**Response 200:** `{ users, success, message }` — users are sanitized"
           },
           "response": []
         },
@@ -197,7 +199,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users", "{{userId}}"]
             },
-            "description": "Returns a single user. **Owner or admin.**\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin\n\n**Response 404:** user not found"
+            "description": "Returns a single user. **Owner or admin.** Requires `accessToken` cookie.\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin\n\n**Response 404:** user not found"
           },
           "response": []
         },
@@ -215,7 +217,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users", "{{userId}}"]
             },
-            "description": "Updates a user. **Owner or admin.** All body fields are optional.\n\n**Body:** `{ email?, password?, role? }` — password min 8 chars if provided\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin"
+            "description": "Updates a user. **Owner or admin.** Requires `accessToken` cookie. All body fields are optional.\n\n**Body:** `{ email?, password?, role? }` — password min 8 chars if provided\n\n**Response 200:** `{ user, success, message }`\n\n**Response 403:** not owner and not admin"
           },
           "response": []
         },
@@ -229,7 +231,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users", "{{userId}}"]
             },
-            "description": "Deletes a user. **Owner or admin.**\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ success, message }`\n\n**Response 403:** not owner and not admin"
+            "description": "Deletes a user. **Owner or admin.** Requires `accessToken` cookie.\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ success, message }`\n\n**Response 403:** not owner and not admin"
           },
           "response": []
         },
@@ -243,7 +245,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "users"]
             },
-            "description": "Deletes all users. **Admin only.**\n\n**Response 200:** `{ success, message }`"
+            "description": "Deletes all non-admin users. **Admin only.** Requires `accessToken` cookie.\n\n**Response 200:** `{ success, message }`"
           },
           "response": []
         }
@@ -251,10 +253,26 @@
     },
     {
       "name": "Workouts",
-      "description": "Protected routes. Require `accessToken` cookie. Workouts are scoped to the authenticated user.",
+      "description": "Protected routes. Require `accessToken` cookie. Workouts are scoped to the authenticated user.\n\n**Side effects (async via RabbitMQ fanout):**\n- Create/update/delete publish to `workout-events` exchange\n- `total-workouts-sync` consumer updates aggregated totals\n- `badge-evaluation` worker awards badges based on totals",
       "item": [
         {
           "name": "Create Workout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.workout?.id) {",
+                  "        pm.collectionVariables.set('workoutId', json.workout.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -267,7 +285,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "workouts"]
             },
-            "description": "Creates a workout for the authenticated user.\n\n**Body:** `{ workoutType, count }`\n- `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- `count`: positive integer\n\n**Response 201:** `{ workout, success, message }`"
+            "description": "Creates a workout for the authenticated user.\n\n**Body:** `{ workoutType, count }`\n- `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- `count`: positive integer\n\n**Side effects:** publishes workout event → total-workouts sync + badge evaluation\n\n**Response 201:** `{ workout, success, message }`"
           },
           "response": []
         },
@@ -282,6 +300,248 @@
               "path": ["api", "workouts"]
             },
             "description": "Returns workouts for the authenticated user, ordered by `createdAt` desc.\n\n**Response 200:** `{ workouts, success, message }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Workout by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/workouts/{{workoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "workouts", "{{workoutId}}"]
+            },
+            "description": "Returns a single workout owned by the authenticated user.\n\n**Params:** `id` — UUID\n\n**Response 200:** `{ workout, success, message }`\n\n**Response 404:** workout not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workout by ID",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workoutType\": \"PUSHUP\",\n  \"count\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/workouts/{{workoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "workouts", "{{workoutId}}"]
+            },
+            "description": "Updates a workout by id.\n\n**Params:** `id` — UUID (required — set `{{workoutId}}` from Create Workout)\n\n**Body:** `{ workoutType, count }` — both required\n\n**Side effects:** publishes workout updated event with `previousWorkoutType` if type changed\n\n**Response 200:** `{ workout, success, message }`\n\n**Response 404:** workout not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Workout by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/workouts/{{workoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "workouts", "{{workoutId}}"]
+            },
+            "description": "Deletes a workout by id.\n\n**Params:** `id` — UUID\n\n**Side effects:** publishes workout deleted event → total-workouts sync + badge re-evaluation\n\n**Response 200:** `{ success, message }`\n\n**Response 404:** workout not found"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Total Workouts",
+      "description": "Protected routes. Require `accessToken` cookie.\n\nStores aggregated workout counts per `(userId, workoutType)`. Synced automatically by the RabbitMQ consumer when workouts change. These endpoints allow reading and manual management.\n\n- Authenticated user: own records only\n- Admin: list all records via `GET /all`",
+      "item": [
+        {
+          "name": "Get My Total Workouts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.totalWorkouts?.length > 0 && json.totalWorkouts[0]?.id) {",
+                  "        pm.collectionVariables.set('totalWorkoutId', String(json.totalWorkouts[0].id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts"]
+            },
+            "description": "Returns all total-workout records for the authenticated user (one per `workoutType`).\n\n**Response 200:** `{ totalWorkouts, success, message }`\n\nEach item: `{ id, userId, workoutType, totalCount }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Total Workouts (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts", "all"]
+            },
+            "description": "Returns every total-workout record in the system. **Admin only.**\n\n**Response 200:** `{ totalWorkouts, success, message }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Total Workout by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts/{{totalWorkoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts", "{{totalWorkoutId}}"]
+            },
+            "description": "Returns a single total-workout record owned by the authenticated user.\n\n**Params:** `id` — positive integer\n\n**Response 200:** `{ totalWorkout, success, message }`\n\n**Response 404:** record not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Total Workout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.totalWorkout?.id) {",
+                  "        pm.collectionVariables.set('totalWorkoutId', String(json.totalWorkout.id));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workoutType\": \"PUSHUP\",\n  \"totalCount\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts"]
+            },
+            "description": "Manually creates a total-workout record for the authenticated user.\n\n**Body:** `{ workoutType, totalCount }`\n- `workoutType`: PUSHUP | SQUAT | SITUP | PLANK\n- `totalCount`: non-negative integer\n\n**Note:** Only one record per `(userId, workoutType)` is allowed. Prefer creating/updating workouts — totals sync automatically.\n\n**Response 201:** `{ totalWorkout, success, message }`\n\n**Response 400:** duplicate record for this user and type"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Total Workout by ID",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"totalCount\": 150\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts/{{totalWorkoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts", "{{totalWorkoutId}}"]
+            },
+            "description": "Updates a total-workout record owned by the authenticated user. All body fields are optional.\n\n**Params:** `id` — positive integer\n\n**Body:** `{ workoutType?, totalCount? }`\n- `totalCount`: non-negative integer\n\n**Response 200:** `{ totalWorkout, success, message }`\n\n**Response 404:** record not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Total Workout by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/total-workouts/{{totalWorkoutId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "total-workouts", "{{totalWorkoutId}}"]
+            },
+            "description": "Deletes a total-workout record owned by the authenticated user.\n\n**Params:** `id` — positive integer\n\n**Response 200:** `{ success, message }`\n\n**Response 404:** record not found"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Badges",
+      "description": "Protected routes. Require `accessToken` cookie.\n\nBadges are awarded automatically by the badge worker when workout totals cross thresholds (100/500/1000 per type). Manual award/update/delete also available for the authenticated user.",
+      "item": [
+        {
+          "name": "Get My Badges",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/badges",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "badges"]
+            },
+            "description": "Returns all badges for the authenticated user.\n\n**Response 200:** `{ badges, success, message }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Badge by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/badges/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "badges", "1"]
+            },
+            "description": "Returns a single badge owned by the authenticated user.\n\n**Params:** `id` — integer\n\n**Response 200:** `{ badge, success, message }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Award Badge",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"badgeType\": \"BRONZE_PUSHUP\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/badges",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "badges"]
+            },
+            "description": "Manually awards a badge to the authenticated user.\n\n**Body:** `{ badgeType }` — e.g. BRONZE_PUSHUP, SILVER_SQUAT, GOLD_PLANK\n\n**Response 201:** `{ badge, success, message }`"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Badge by ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/badges/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "badges", "1"]
+            },
+            "description": "Deletes a badge owned by the authenticated user.\n\n**Response 200:** `{ success, message }`"
           },
           "response": []
         }

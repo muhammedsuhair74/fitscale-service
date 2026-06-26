@@ -3,19 +3,24 @@ import { Workout, WorkoutType } from "@prisma/client";
 import { redis } from "../../lib/redis";
 import { cacheKeys } from "../../constants";
 import { getCache, setCache } from "../../lib/cache";
-import { publishWorkoutCreated } from "./workout.producer";
-import { syncTotalWorkoutCountService } from "../total-workouts/total-workouts.service";
+import {
+  publishWorkoutCreated,
+  publishWorkoutDeleted,
+  publishWorkoutUpdated,
+} from "./workout.producer";
+
+async function invalidateWorkoutCaches(userId: string) {
+  await redis.del(cacheKeys.allWorkouts);
+  await redis.del(cacheKeys.workoutsByUserId(userId));
+}
 
 export const getWorkoutsService = async (
   userId: string,
 ): Promise<Workout[]> => {
   const cachedData = await getCache(cacheKeys.workoutsByUserId(userId));
   if (cachedData) {
-    console.log("Redis Hit");
     return cachedData as Workout[];
   }
-
-  console.log("Redis Miss");
 
   const data = await prisma.workout.findMany({
     where: { userId },
@@ -28,14 +33,14 @@ export const getWorkoutsService = async (
 export const getWorkoutByIdService = async (
   userId: string,
   id: string,
-): Promise<Workout | null> => {
-  const workout = await prisma.workout.findUnique({
+): Promise<Workout> => {
+  const workout = await prisma.workout.findFirst({
     where: { id, userId },
   });
 
   if (!workout) throw new Error("Workout not found");
 
-  return workout || null;
+  return workout;
 };
 
 export const createWorkoutService = async (
@@ -50,21 +55,18 @@ export const createWorkoutService = async (
       userId,
     },
   });
-  await redis.del(cacheKeys.allWorkouts);
-  await redis.del(cacheKeys.workoutsByUserId(userId));
-  await syncTotalWorkoutCountService(userId, workoutType);
-  await publishWorkoutCreated(workout.id, workout.userId);
+
+  await invalidateWorkoutCaches(userId);
+  publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
+
   return workout;
 };
 
 export const getAllWorkoutsService = async (): Promise<Workout[]> => {
   const cachedData = await redis.get(cacheKeys.allWorkouts);
   if (cachedData) {
-    console.log("Redis Hit");
     return JSON.parse(cachedData) as Workout[];
   }
-
-  console.log("Redis Miss");
 
   const data = await prisma.workout.findMany();
   await redis.set(cacheKeys.allWorkouts, JSON.stringify(data), { EX: 60 });
@@ -73,12 +75,13 @@ export const getAllWorkoutsService = async (): Promise<Workout[]> => {
 };
 
 export const editWorkoutService = async (
+  userId: string,
   id: string,
   workoutType: WorkoutType,
   count: number,
 ): Promise<Workout> => {
-  const existingWorkout = await prisma.workout.findUnique({
-    where: { id },
+  const existingWorkout = await prisma.workout.findFirst({
+    where: { id, userId },
   });
 
   if (!existingWorkout) {
@@ -90,24 +93,23 @@ export const editWorkoutService = async (
     data: { workoutType, count },
   });
 
-  await redis.del(cacheKeys.allWorkouts);
-  await redis.del(cacheKeys.workoutsByUserId(existingWorkout.userId));
-
-  await syncTotalWorkoutCountService(existingWorkout.userId, workoutType);
-
-  if (existingWorkout.workoutType !== workoutType) {
-    await syncTotalWorkoutCountService(
-      existingWorkout.userId,
-      existingWorkout.workoutType,
-    );
-  }
+  await invalidateWorkoutCaches(userId);
+  publishWorkoutUpdated(
+    workout.id,
+    workout.userId,
+    workout.workoutType,
+    existingWorkout.workoutType,
+  );
 
   return workout;
 };
 
-export const deleteWorkoutService = async (id: string): Promise<void> => {
-  const existingWorkout = await prisma.workout.findUnique({
-    where: { id },
+export const deleteWorkoutService = async (
+  userId: string,
+  id: string,
+): Promise<void> => {
+  const existingWorkout = await prisma.workout.findFirst({
+    where: { id, userId },
   });
 
   if (!existingWorkout) {
@@ -118,9 +120,9 @@ export const deleteWorkoutService = async (id: string): Promise<void> => {
     where: { id },
   });
 
-  await redis.del(cacheKeys.allWorkouts);
-  await redis.del(cacheKeys.workoutsByUserId(existingWorkout.userId));
-  await syncTotalWorkoutCountService(
+  await invalidateWorkoutCaches(userId);
+  publishWorkoutDeleted(
+    existingWorkout.id,
     existingWorkout.userId,
     existingWorkout.workoutType,
   );

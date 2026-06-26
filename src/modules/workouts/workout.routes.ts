@@ -1,8 +1,10 @@
 import { Router } from "express";
 import {
   createWorkoutController,
+  deleteWorkoutController,
   getWorkoutsController,
   getWorkoutByIdController,
+  updateWorkoutController,
 } from "./workout.controller";
 import {
   validateBody,
@@ -11,6 +13,7 @@ import {
 import {
   createWorkoutSchema,
   workoutIdParamSchema,
+  updateWorkoutSchema,
 } from "../../validators/workouts.schema";
 
 const workoutRoutes = Router();
@@ -25,6 +28,17 @@ workoutRoutes.get(
   "/:id",
   validateParams(workoutIdParamSchema),
   getWorkoutByIdController,
+);
+workoutRoutes.put(
+  "/:id",
+  validateParams(workoutIdParamSchema),
+  validateBody(updateWorkoutSchema),
+  updateWorkoutController,
+);
+workoutRoutes.delete(
+  "/:id",
+  validateParams(workoutIdParamSchema),
+  deleteWorkoutController,
 );
 
 export default workoutRoutes;

@@ -1,107 +1,153 @@
 import { prisma } from "../../lib/prisma";
-import { Badge, BadgeType } from "@prisma/client";
+import { Badge, BadgeType, WorkoutType } from "@prisma/client";
 
-const getBadgesService = async () => {
-  const badges = await prisma.badge.findMany();
-  return badges;
+const BADGE_THRESHOLDS: Record<
+  WorkoutType,
+  { bronze: number; silver: number; gold: number }
+> = {
+  PUSHUP: { bronze: 100, silver: 500, gold: 1000 },
+  SQUAT: { bronze: 100, silver: 500, gold: 1000 },
+  SITUP: { bronze: 100, silver: 500, gold: 1000 },
+  PLANK: { bronze: 100, silver: 500, gold: 1000 },
 };
 
-const getBadgeByIdService = async (id: string) => {
-  const badge = await prisma.badge.findUnique({
-    where: { id: Number(id) },
+const BADGE_TYPES: Record<
+  WorkoutType,
+  { bronze: BadgeType; silver: BadgeType; gold: BadgeType }
+> = {
+  PUSHUP: {
+    bronze: "BRONZE_PUSHUP",
+    silver: "SILVER_PUSHUP",
+    gold: "GOLD_PUSHUP",
+  },
+  SQUAT: {
+    bronze: "BRONZE_SQUAT",
+    silver: "SILVER_SQUAT",
+    gold: "GOLD_SQUAT",
+  },
+  SITUP: {
+    bronze: "BRONZE_SITUP",
+    silver: "SILVER_SITUP",
+    gold: "GOLD_SITUP",
+  },
+  PLANK: {
+    bronze: "BRONZE_PLANK",
+    silver: "SILVER_PLANK",
+    gold: "GOLD_PLANK",
+  },
+};
+
+export const getBadgesByUserService = async (userId: string) => {
+  return prisma.badge.findMany({
+    where: { userId },
+    orderBy: { awardedAt: "desc" },
   });
+};
+
+export const getBadgeByIdService = async (userId: string, id: number) => {
+  const badge = await prisma.badge.findFirst({
+    where: { id, userId },
+  });
+
+  if (!badge) {
+    throw new Error("Badge not found");
+  }
+
   return badge;
 };
 
-const awardBadgeService = async (badgeType: BadgeType, userId: string) => {
+export const awardBadgeService = async (
+  badgeType: BadgeType,
+  userId: string,
+) => {
   try {
-    const newBadge = await prisma.badge.create({
-      data: {
-        userId,
-        badgeType,
-      },
+    return await prisma.badge.create({
+      data: { userId, badgeType },
     });
-    return newBadge;
   } catch (error) {
+    const prismaError = error as { code?: string };
+    if (prismaError.code === "P2002") {
+      return prisma.badge.findUnique({
+        where: { userId_badgeType: { userId, badgeType } },
+      });
+    }
     throw new Error("Failed to create badge");
   }
 };
 
-const updateBadgeService = async (id: number, badge: Badge) => {
-  const updatedBadge = await prisma.badge.update({
-    where: { id: id },
-    data: badge,
+export const updateBadgeService = async (
+  userId: string,
+  id: number,
+  badgeType: BadgeType,
+) => {
+  const existing = await getBadgeByIdService(userId, id);
+
+  return prisma.badge.update({
+    where: { id: existing.id },
+    data: { badgeType },
   });
-  return updatedBadge;
 };
 
-const deleteBadgeService = async (id: number) => {
-  await prisma.badge.delete({
-    where: { id: id },
-  });
+export const deleteBadgeService = async (userId: string, id: number) => {
+  await getBadgeByIdService(userId, id);
+  await prisma.badge.delete({ where: { id } });
 };
 
-async function getTotalPushupsService(userId: string) {
-  const result = await prisma.workout.aggregate({
+async function getTotalForWorkoutType(
+  userId: string,
+  workoutType: WorkoutType,
+) {
+  const totalWorkout = await prisma.totalWorkouts.findUnique({
     where: {
-      userId,
-      workoutType: "PUSHUP",
+      userId_workoutType: { userId, workoutType },
     },
-    _sum: {
-      count: true,
-    },
+  });
+
+  if (totalWorkout) {
+    return totalWorkout.totalCount;
+  }
+
+  const result = await prisma.workout.aggregate({
+    where: { userId, workoutType },
+    _sum: { count: true },
   });
 
   return result._sum.count ?? 0;
 }
 
-async function getTotalSquatsService(userId: string) {
-  const result = await prisma.workout.aggregate({
-    where: {
-      userId,
-      workoutType: "SQUAT",
-    },
-    _sum: {
-      count: true,
-    },
-  });
-  return result._sum.count ?? 0;
+export async function evaluateBadgesForWorkoutType(
+  userId: string,
+  workoutType: WorkoutType,
+) {
+  const total = await getTotalForWorkoutType(userId, workoutType);
+  const thresholds = BADGE_THRESHOLDS[workoutType];
+  const badgeTypes = BADGE_TYPES[workoutType];
+
+  if (total >= thresholds.bronze) {
+    await awardBadgeService(badgeTypes.bronze, userId);
+  }
+  if (total >= thresholds.silver) {
+    await awardBadgeService(badgeTypes.silver, userId);
+  }
+  if (total >= thresholds.gold) {
+    await awardBadgeService(badgeTypes.gold, userId);
+  }
 }
 
-async function getTotalSitupsService(userId: string) {
-  const result = await prisma.workout.aggregate({
-    where: {
-      userId,
-      workoutType: "SITUP",
-    },
-    _sum: {
-      count: true,
-    },
-  });
-  return result._sum.count ?? 0;
-}
+export async function evaluateAllBadges(userId: string) {
+  const workoutTypes: WorkoutType[] = ["PUSHUP", "SQUAT", "SITUP", "PLANK"];
 
-async function getTotalPlanksService(userId: string) {
-  const result = await prisma.workout.aggregate({
-    where: {
-      userId,
-      workoutType: "PLANK",
-    },
-    _sum: {
-      count: true,
-    },
-  });
-  return result._sum.count ?? 0;
+  for (const workoutType of workoutTypes) {
+    await evaluateBadgesForWorkoutType(userId, workoutType);
+  }
 }
 
 export default {
-  getBadgesService,
+  getBadgesByUserService,
   getBadgeByIdService,
   awardBadgeService,
   updateBadgeService,
   deleteBadgeService,
-  getTotalPushupsService,
-  getTotalSquatsService,
-  getTotalSitupsService,
-  getTotalPlanksService,
+  evaluateBadgesForWorkoutType,
+  evaluateAllBadges,
 };

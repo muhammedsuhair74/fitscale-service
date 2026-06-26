@@ -1,16 +1,58 @@
+import { WorkoutType } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
-import { RABBITMQ_QUEUE_NAMES } from "../../constants";
+import {
+  RABBITMQ_EXCHANGE,
+  WorkoutEventPayload,
+  WorkoutEventType,
+} from "../../constants";
 
-export async function publishWorkoutCreated(workoutId: string, userId: string) {
+function publishWorkoutEvent(payload: WorkoutEventPayload) {
   const channel = getChannel();
-
-  channel.sendToQueue(
-    RABBITMQ_QUEUE_NAMES.WORKOUT_CREATED,
-    Buffer.from(
-      JSON.stringify({
-        workoutId,
-        userId,
-      }),
-    ),
-  );
+  console.log("Publishing workout event", payload);
+  channel.publish(RABBITMQ_EXCHANGE, "", Buffer.from(JSON.stringify(payload)), {
+    persistent: true,
+  });
 }
+
+export function publishWorkoutCreated(
+  workoutId: string,
+  userId: string,
+  workoutType: WorkoutType,
+) {
+  publishWorkoutEvent({
+    event: "created",
+    workoutId,
+    userId,
+    workoutType,
+  });
+}
+
+export function publishWorkoutUpdated(
+  workoutId: string,
+  userId: string,
+  workoutType: WorkoutType,
+  previousWorkoutType: WorkoutType,
+) {
+  publishWorkoutEvent({
+    event: "updated",
+    workoutId,
+    userId,
+    workoutType,
+    previousWorkoutType,
+  });
+}
+
+export function publishWorkoutDeleted(
+  workoutId: string,
+  userId: string,
+  workoutType: WorkoutType,
+) {
+  publishWorkoutEvent({
+    event: "deleted",
+    workoutId,
+    userId,
+    workoutType,
+  });
+}
+
+export type { WorkoutEventPayload, WorkoutEventType };

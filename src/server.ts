@@ -9,6 +9,7 @@ import "./lib/redis";
 import router from "./routes/index";
 import { performanceLogger } from "./middleware/performance.middleware";
 import { connectRabbit } from "./lib/rabbitmq";
+import consumersExecuter from "./consumers";
 
 const app = express();
 app.use(helmet());
@@ -16,7 +17,6 @@ app.use(helmet());
 const clientOrigin = process.env.CLIENT_URL ?? "http://localhost:3000";
 
 app.use(performanceLogger);
-connectRabbit();
 app.use(
   cors({
     origin: clientOrigin,
@@ -41,11 +41,22 @@ app.use("/api", router);
 
 const PORT = process.env.PORT || 5001;
 
-app
-  .listen(PORT, () => {
-    console.log(`Server running on ${PORT}`);
-  })
-  .on("error", (err) => {
-    console.error(err);
-    process.exit(1);
-  });
+async function startServer() {
+  await connectRabbit();
+
+  consumersExecuter();
+
+  app
+    .listen(PORT, () => {
+      console.log(`Server running on ${PORT}`);
+    })
+    .on("error", (err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}
+
+startServer().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

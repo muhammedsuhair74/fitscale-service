@@ -168,7 +168,7 @@ export const syncTotalWorkoutCountService = async (
     return updateTotalWorkoutService(
       userId,
       existing.id,
-      undefined,
+      existing.workoutType,
       totalCount,
     );
   }

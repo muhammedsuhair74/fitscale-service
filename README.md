@@ -98,8 +98,19 @@ Verify they are up:
 
 ```bash
 docker compose ps
-# db, redis, and rabbitmq should show "Up" (redis also "healthy")
+# db, redis, and rabbitmq should show "Up" (db and redis also "healthy")
 ```
+
+> **Use one Postgres only.** This project's `db` service publishes port **5432**. If you also run a separate Postgres container (e.g. a standalone `fitscale-postgres`), only one can bind to `localhost:5432`. The app, Prisma, and `psql` must all talk to the **same** instance — otherwise migrations and SQL commands hit different empty databases.
+>
+> Before starting Compose Postgres, check for conflicts:
+>
+> ```bash
+> lsof -i :5432
+> docker ps --filter publish=5432
+> ```
+>
+> Stop any extra Postgres container that is not this project's `db` service.
 
 **Option B — Install locally:**
 
@@ -121,10 +132,21 @@ REDIS_URL="redis://localhost:6379"
 
 ### 4. Sync the database
 
+Run migrations against the same Postgres your `DATABASE_URL` points to (`localhost:5432` when using Compose `db`):
+
 ```bash
 npx prisma generate
 npx prisma migrate dev
 ```
+
+Confirm tables exist:
+
+```bash
+docker compose exec db psql -U postgres -d fitscale -c "\dt"
+# Expect: User, Workout, Badge, TotalWorkouts, _prisma_migrations
+```
+
+If `\dt` shows **no relations**, migrations have not been applied to this database — run `npx prisma migrate dev` again, or see [Troubleshooting](#troubleshooting).
 
 ### 5. Start the API
 
@@ -301,6 +323,129 @@ Schema lives in `prisma/schema.prisma`. Migrations are in `prisma/migrations/`.
 3. Update services/controllers
 4. Restart the dev server
 
+### Running SQL (`psql`)
+
+Your app uses `DATABASE_URL` → `localhost:5432/fitscale` for local dev. SQL commands must target **that same database**.
+
+| How you connect | When to use |
+| --------------- | ----------- |
+| `docker compose exec db psql ...` | **Recommended** — always hits this project's Compose `db` service |
+| `psql "postgresql://postgres:postgres@localhost:5432/fitscale"` | Same DB as `.env`, only if Compose `db` owns port 5432 on the host |
+
+> **Common mistake:** `docker compose exec db psql` and `localhost:5432` are **different databases** if two Postgres containers are running and only one is published on 5432. Symptoms: `\dt` shows no tables, or `relation "User" does not exist` even after migrations. Fix: stop the extra Postgres container, use Compose `db` only, then run `npx prisma migrate dev`.
+
+Once inside the PostgreSQL shell, type SQL normally and end each statement with `;`. Put spaces between SQL keywords (e.g. `"User" SET`, not `"User"SET`).
+
+**Open an interactive shell (Compose `db`):**
+
+```bash
+docker compose exec db psql -U postgres -d fitscale
+```
+
+You should see a prompt like `fitscale=#`. Example queries:
+
+```sql
+\dt
+SELECT * FROM "User" LIMIT 5;
+SELECT COUNT(*) FROM "Workout";
+\d "User"
+```
+
+**One-liner (run SQL without staying in the shell):**
+
+```bash
+docker compose exec db psql -U postgres -d fitscale -c 'SELECT COUNT(*) FROM "Workout";'
+```
+
+**Alternative — connection string (host port, same as `.env`):**
+
+```bash
+psql "postgresql://postgres:postgres@localhost:5432/fitscale"
+```
+
+Use this only when Compose `db` is the container bound to port 5432. Verify first:
+
+```bash
+docker compose ps db
+lsof -i :5432
+```
+
+**Useful `psql` meta-commands** (start with `\`, not SQL):
+
+| Command | Description |
+| ------- | ----------- |
+| `\l` | List all databases |
+| `\c fitscale` | Connect to the `fitscale` database |
+| `\dt` | List tables in the current database |
+| `\d "TableName"` | Describe a table |
+| `\q` | Quit |
+| `\?` | Help for `psql` commands |
+| `\h SELECT` | Help for SQL syntax |
+
+> Prisma table names are often capitalized — use double quotes exactly as in `schema.prisma` (e.g. `"User"`, `"Workout"`).
+
+### List databases and tables
+
+**List all databases:**
+
+```bash
+docker compose exec db psql -U postgres -c "\l"
+```
+
+SQL equivalent:
+
+```bash
+docker compose exec db psql -U postgres -c "SELECT datname FROM pg_database ORDER BY datname;"
+```
+
+**List tables in `fitscale`:**
+
+```bash
+docker compose exec db psql -U postgres -d fitscale -c "\dt"
+```
+
+**Via connection string (when Compose `db` owns port 5432):**
+
+```bash
+psql "postgresql://postgres:postgres@localhost:5432/fitscale" -c "\dt"
+```
+
+### Common SQL snippets
+
+**Update a user's role** — valid values: `ADMIN`, `TRAINER`, `USER`:
+
+```sql
+UPDATE "User"
+SET role = 'ADMIN', "updatedAt" = NOW()
+WHERE email = 'user@example.com';
+```
+
+By user id:
+
+```sql
+UPDATE "User"
+SET role = 'TRAINER', "updatedAt" = NOW()
+WHERE id = 'your-user-uuid-here';
+```
+
+One-liner via Compose:
+
+```bash
+docker compose exec db psql -U postgres -d fitscale -c "
+UPDATE \"User\"
+SET role = 'ADMIN', \"updatedAt\" = NOW()
+WHERE email = 'user@example.com';
+"
+```
+
+**Verify the change:**
+
+```bash
+docker compose exec db psql -U postgres -d fitscale -c "
+SELECT id, email, role FROM \"User\" WHERE email = 'user@example.com';
+"
+```
+
 ---
 
 ## Running the Project
@@ -408,6 +553,7 @@ curl http://localhost/health
 | `docker compose down` | Stop and remove containers |
 | `docker compose down -v` | Stop and **delete database volume** (fresh DB) |
 | `docker compose exec api sh` | Shell into the API container |
+| `docker compose exec db psql -U postgres -d fitscale` | Open PostgreSQL shell |
 | `docker compose exec redis redis-cli ping` | Test Redis |
 
 ### Cold start (from scratch)
@@ -499,14 +645,20 @@ docker compose up db redis rabbitmq -d
 npm run dev
 ```
 
-Ensure `.env` uses host URLs:
+Ensure `.env` uses host URLs (Compose `db` must own port **5432**):
 
 ```bash
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/fitscale?schema=public"
 REDIS_URL="redis://localhost:6379"
 ```
 
-You do **not** need to run `docker run redis` or `docker run rabbitmq` separately — always use `docker compose up` for this project. Container names like `fitscale-backend-redis-1` are created by Compose; they are not image names.
+You do **not** need to run `docker run postgres` or `docker run redis` separately — always use `docker compose up` for this project. Container names like `fitscale-backend-redis-1` are created by Compose; they are not image names.
+
+If you previously used a standalone Postgres container, stop it before relying on Compose `db`:
+
+```bash
+docker stop fitscale-postgres   # example — use your container name from `docker ps`
+```
 
 Stop dependencies when done:
 
@@ -617,7 +769,9 @@ Dockerfile                           # Multi-stage API image
 | RabbitMQ port conflict on `5672` | Something else is using 5672: `lsof -i :5672`. Stop that process or change the host port in `docker-compose.yml` **and** update `src/lib/rabbitmq.ts` to match |
 | `docker run fitscale-backend-redis-1` fails | That is a container name, not an image. Use `docker compose up redis -d` instead |
 | `EADDRINUSE` on port 5001 | Another process (often a previous `npm run dev`) is using the port: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` or use a different `PORT` in `.env` |
-| Prisma can't connect locally | Confirm Postgres is running; verify `DATABASE_URL` |
+| `\dt` shows no relations / `relation "User" does not exist` | Wrong or empty database. Use one Postgres: stop extra containers on 5432 (`docker ps --filter publish=5432`), run `docker compose up db -d`, then `npx prisma migrate dev`. Connect with `docker compose exec db psql -U postgres -d fitscale` |
+| `docker compose exec db` has no tables but app has data | Two Postgres instances — app hits `localhost:5432`, `exec db` hits Compose internal DB. Stop the other container and use Compose `db` only |
+| Prisma can't connect locally | Confirm Postgres is running (`docker compose ps db`); verify `DATABASE_URL`; check port 5432 is not owned by a different container (`lsof -i :5432`) |
 | Prisma can't connect in Docker | Use service name `db`, not `localhost`, in Compose env |
 | Cookies not sent from browser | Set `CLIENT_URL` to your frontend origin; CORS does not allow `*` with credentials |
 | Cookies not stored on localhost | `Secure` cookies only apply when `NODE_ENV=production` |
@@ -636,6 +790,7 @@ Dockerfile                           # Multi-stage API image
 npm install
 docker compose up db redis rabbitmq -d
 npx prisma migrate dev
+docker compose exec db psql -U postgres -d fitscale -c "\dt"   # confirm tables exist
 npm run dev
 # Expect: "Redis Connected" and "RabbitMQ Connected" in logs
 

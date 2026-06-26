@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import {
   createWorkoutService,
+  deleteWorkoutService,
+  editWorkoutService,
   getWorkoutByIdService,
   getWorkoutsService,
 } from "./workout.service";
@@ -62,6 +64,55 @@ export const getWorkoutByIdController = async (
       workout,
       success: true,
       message: "Workout fetched successfully",
+    });
+  } catch (error) {
+    res.status(404).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const updateWorkoutController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { userId } = (req as Request & { user: AuthUser }).user;
+    const { id } = req.params;
+    const { workoutType, count } = req.body;
+    const workout = await editWorkoutService(
+      userId,
+      id as string,
+      workoutType,
+      count,
+    );
+
+    res.status(200).json({
+      workout,
+      success: true,
+      message: "Workout updated successfully",
+    });
+  } catch (error) {
+    res.status(404).json({
+      message: (error as Error).message,
+      success: false,
+    });
+  }
+};
+
+export const deleteWorkoutController = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { userId } = (req as Request & { user: AuthUser }).user;
+    const { id } = req.params;
+    await deleteWorkoutService(userId, id as string);
+
+    res.status(200).json({
+      success: true,
+      message: "Workout deleted successfully",
     });
   } catch (error) {
     res.status(404).json({

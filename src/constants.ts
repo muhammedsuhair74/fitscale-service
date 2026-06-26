@@ -18,6 +18,19 @@ export const cacheKeys = {
   totalWorkoutsByUserId: (userId: string) => `total-workouts-by-user-${userId}`,
 };
 
+export const RABBITMQ_EXCHANGE = "workout-events";
+
 export const RABBITMQ_QUEUE_NAMES = {
-  WORKOUT_CREATED: "workout-created",
+  TOTAL_WORKOUTS_SYNC: "total-workouts-sync",
+  BADGE_EVALUATION: "badge-evaluation",
 };
+
+export type WorkoutEventType = "created" | "updated" | "deleted";
+
+export interface WorkoutEventPayload {
+  event: WorkoutEventType;
+  workoutId: string;
+  userId: string;
+  workoutType: WorkoutType;
+  previousWorkoutType?: WorkoutType;
+}
