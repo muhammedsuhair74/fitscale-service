@@ -1,6 +1,6 @@
-import { getChannel } from "../../lib/rabbitmq";
-import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "../../constants";
-import { syncTotalWorkoutCountService } from "./total-workouts.service";
+import { getChannel } from "./rabbitmq";
+import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "./constants";
+import { syncTotalWorkoutCountService } from "../services/total-workout.service";
 
 async function handleWorkoutEvent(payload: WorkoutEventPayload) {
   await syncTotalWorkoutCountService(payload.userId, payload.workoutType);
@@ -42,5 +42,3 @@ export function startTotalWorkoutsConsumer() {
 
   console.log("Total workouts consumer started");
 }
-
-export { handleWorkoutEvent };

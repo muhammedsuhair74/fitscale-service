@@ -6,11 +6,9 @@ import {
   getTotalWorkoutByIdService,
   getTotalWorkoutsByUserService,
   updateTotalWorkoutService,
-} from "./total-workouts.service";
+} from "../services/total-workout.service";
 
-type AuthUser = {
-  userId: string;
-};
+type AuthUser = { userId: string };
 
 export const getTotalWorkoutsController = async (
   req: Request,
@@ -19,7 +17,6 @@ export const getTotalWorkoutsController = async (
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
     const totalWorkouts = await getTotalWorkoutsByUserService(userId);
-
     res.status(200).json({
       totalWorkouts,
       success: true,
@@ -42,7 +39,6 @@ export const getAllTotalWorkoutsController = async (
 ): Promise<void> => {
   try {
     const totalWorkouts = await getAllTotalWorkoutsService();
-
     res.status(200).json({
       totalWorkouts,
       success: true,
@@ -62,12 +58,10 @@ export const getTotalWorkoutByIdController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
     const totalWorkout = await getTotalWorkoutByIdService(
       userId,
-      Number(id),
+      Number(req.params.id),
     );
-
     res.status(200).json({
       totalWorkout,
       success: true,
@@ -93,7 +87,6 @@ export const createTotalWorkoutController = async (
       workoutType,
       totalCount,
     );
-
     res.status(201).json({
       totalWorkout,
       success: true,
@@ -113,15 +106,13 @@ export const updateTotalWorkoutController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
     const { workoutType, totalCount } = req.body;
     const totalWorkout = await updateTotalWorkoutService(
       userId,
-      Number(id),
+      Number(req.params.id),
       workoutType,
       totalCount,
     );
-
     res.status(200).json({
       totalWorkout,
       success: true,
@@ -141,9 +132,7 @@ export const deleteTotalWorkoutController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
-    await deleteTotalWorkoutService(userId, Number(id));
-
+    await deleteTotalWorkoutService(userId, Number(req.params.id));
     res.status(200).json({
       success: true,
       message: "Total workout deleted successfully",

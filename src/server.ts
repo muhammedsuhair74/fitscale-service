@@ -7,9 +7,9 @@ import cookieParser from "cookie-parser";
 
 import "./lib/redis";
 import router from "./routes/index";
-import { performanceLogger } from "./middleware/performance.middleware";
+import { performanceLogger } from "./middlewares/performance.middleware";
 import { connectRabbit } from "./lib/rabbitmq";
-import consumersExecuter from "./consumers";
+import startConsumers from "./lib/consumers";
 
 const app = express();
 app.use(helmet());
@@ -25,9 +25,7 @@ app.use(
 );
 
 app.use(express.json());
-
 app.use(cookieParser());
-
 app.use(morgan("dev"));
 
 app.get("/health", (_, res) => {
@@ -43,8 +41,7 @@ const PORT = process.env.PORT || 5001;
 
 async function startServer() {
   await connectRabbit();
-
-  consumersExecuter();
+  startConsumers();
 
   app
     .listen(PORT, () => {

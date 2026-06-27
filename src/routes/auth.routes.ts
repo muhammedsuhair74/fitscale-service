@@ -4,9 +4,9 @@ import {
   logoutUserController,
   registerUserController,
   refreshTokenController,
-} from "./auth.controllers";
-import { validateBody } from "../../middleware/validate.middleware";
-import { loginSchema, registerSchema } from "../../validators/auth.schema";
+} from "../controllers/auth.controller";
+import { validateBody } from "../middlewares/validate.middleware";
+import { loginSchema, registerSchema } from "../validators/auth.schema";
 
 const authRoutes = Router();
 

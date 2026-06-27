@@ -1,12 +1,12 @@
-import { prisma } from "../../lib/prisma";
 import bcrypt from "bcrypt";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import { User } from "@prisma/client";
+import { userRepository } from "../repositories/user.repository";
 import {
   createUserService,
   getUserByEmailOrThrow,
   getUserByIdService,
-} from "../users/users.service";
-import { User } from "@prisma/client";
+} from "./users.service";
 
 const ACCESS_TOKEN_EXPIRY_SECONDS = 60 * 60;
 const REFRESH_TOKEN_EXPIRY_SECONDS = 7 * 24 * 60 * 60;
@@ -50,10 +50,7 @@ export const loginUserService = async (email: string, password: string) => {
     throw new Error("Invalid password");
   }
   const tokens = await setTokensService(user);
-  return {
-    user,
-    tokens,
-  };
+  return { user, tokens };
 };
 
 export const setTokensService = async (
@@ -71,10 +68,7 @@ export const setTokensService = async (
     process.env.JWT_REFRESH_SECRET as string,
     { expiresIn: refreshTokenExpirySeconds },
   );
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { token: refreshToken },
-  });
+  await userRepository.update(user.id, { token: refreshToken });
   return {
     accessToken,
     refreshToken,
@@ -100,10 +94,7 @@ export const refreshTokenService = async (refreshToken: string) => {
 
 export const logoutUserService = async (refreshToken: string) => {
   const { userId } = verifyRefreshToken(refreshToken);
-  await prisma.user.update({
-    where: { id: userId as string },
-    data: { token: null },
-  });
+  await userRepository.update(userId as string, { token: null });
   return {
     success: true,
     message: "User logged out successfully",

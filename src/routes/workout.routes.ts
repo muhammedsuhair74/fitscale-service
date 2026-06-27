@@ -5,16 +5,16 @@ import {
   getWorkoutsController,
   getWorkoutByIdController,
   updateWorkoutController,
-} from "./workout.controller";
+} from "../controllers/workout.controller";
 import {
   validateBody,
   validateParams,
-} from "../../middleware/validate.middleware";
+} from "../middlewares/validate.middleware";
 import {
   createWorkoutSchema,
   workoutIdParamSchema,
   updateWorkoutSchema,
-} from "../../validators/workouts.schema";
+} from "../validators/workouts.schema";
 
 const workoutRoutes = Router();
 

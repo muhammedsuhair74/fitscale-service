@@ -1,5 +1,8 @@
-import { prisma } from "../../lib/prisma";
-import { Badge, BadgeType, WorkoutType } from "@prisma/client";
+import { BadgeType, WorkoutType } from "@prisma/client";
+import { badgeRepository } from "../repositories/badge.repository";
+import { totalWorkoutRepository } from "../repositories/total-workout.repository";
+import { workoutRepository } from "../repositories/workout.repository";
+import { WorkoutEventPayload } from "../lib/constants";
 
 const BADGE_THRESHOLDS: Record<
   WorkoutType,
@@ -38,21 +41,14 @@ const BADGE_TYPES: Record<
 };
 
 export const getBadgesByUserService = async (userId: string) => {
-  return prisma.badge.findMany({
-    where: { userId },
-    orderBy: { awardedAt: "desc" },
-  });
+  return badgeRepository.findManyByUserId(userId);
 };
 
 export const getBadgeByIdService = async (userId: string, id: number) => {
-  const badge = await prisma.badge.findFirst({
-    where: { id, userId },
-  });
-
+  const badge = await badgeRepository.findFirstByIdAndUserId(id, userId);
   if (!badge) {
     throw new Error("Badge not found");
   }
-
   return badge;
 };
 
@@ -61,15 +57,11 @@ export const awardBadgeService = async (
   userId: string,
 ) => {
   try {
-    return await prisma.badge.create({
-      data: { userId, badgeType },
-    });
+    return await badgeRepository.create(userId, badgeType);
   } catch (error) {
     const prismaError = error as { code?: string };
     if (prismaError.code === "P2002") {
-      return prisma.badge.findUnique({
-        where: { userId_badgeType: { userId, badgeType } },
-      });
+      return badgeRepository.findUniqueByUserAndType(userId, badgeType);
     }
     throw new Error("Failed to create badge");
   }
@@ -80,38 +72,28 @@ export const updateBadgeService = async (
   id: number,
   badgeType: BadgeType,
 ) => {
-  const existing = await getBadgeByIdService(userId, id);
-
-  return prisma.badge.update({
-    where: { id: existing.id },
-    data: { badgeType },
-  });
+  await getBadgeByIdService(userId, id);
+  return badgeRepository.update(id, badgeType);
 };
 
 export const deleteBadgeService = async (userId: string, id: number) => {
   await getBadgeByIdService(userId, id);
-  await prisma.badge.delete({ where: { id } });
+  await badgeRepository.delete(id);
 };
 
 async function getTotalForWorkoutType(
   userId: string,
   workoutType: WorkoutType,
 ) {
-  const totalWorkout = await prisma.totalWorkouts.findUnique({
-    where: {
-      userId_workoutType: { userId, workoutType },
-    },
-  });
-
+  const totalWorkout = await totalWorkoutRepository.findByUserAndType(
+    userId,
+    workoutType,
+  );
   if (totalWorkout) {
     return totalWorkout.totalCount;
   }
 
-  const result = await prisma.workout.aggregate({
-    where: { userId, workoutType },
-    _sum: { count: true },
-  });
-
+  const result = await workoutRepository.aggregateCount(userId, workoutType);
   return result._sum.count ?? 0;
 }
 
@@ -136,18 +118,23 @@ export async function evaluateBadgesForWorkoutType(
 
 export async function evaluateAllBadges(userId: string) {
   const workoutTypes: WorkoutType[] = ["PUSHUP", "SQUAT", "SITUP", "PLANK"];
-
   for (const workoutType of workoutTypes) {
     await evaluateBadgesForWorkoutType(userId, workoutType);
   }
 }
 
-export default {
-  getBadgesByUserService,
-  getBadgeByIdService,
-  awardBadgeService,
-  updateBadgeService,
-  deleteBadgeService,
-  evaluateBadgesForWorkoutType,
-  evaluateAllBadges,
-};
+export async function handleBadgeWorkoutEvent(payload: WorkoutEventPayload) {
+  const typesToEvaluate = new Set<WorkoutType>([payload.workoutType]);
+
+  if (
+    payload.event === "updated" &&
+    payload.previousWorkoutType &&
+    payload.previousWorkoutType !== payload.workoutType
+  ) {
+    typesToEvaluate.add(payload.previousWorkoutType);
+  }
+
+  for (const workoutType of typesToEvaluate) {
+    await evaluateBadgesForWorkoutType(payload.userId, workoutType);
+  }
+}

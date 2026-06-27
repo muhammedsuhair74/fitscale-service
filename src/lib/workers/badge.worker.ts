@@ -1,6 +1,6 @@
-import { getChannel } from "../../../lib/rabbitmq";
-import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "../../../constants";
-import { handleBadgeWorkoutEvent } from "../badge.controller";
+import { getChannel } from "../rabbitmq";
+import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "../constants";
+import { handleBadgeWorkoutEvent } from "../../services/badge.service";
 
 export function startBadgeWorker() {
   const channel = getChannel();

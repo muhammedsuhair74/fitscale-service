@@ -1,17 +1,19 @@
 import { Router } from "express";
-import workoutRoutes from "../modules/workouts/workout.routes";
-import totalWorkoutRoutes from "../modules/total-workouts/total-workouts.routes";
-import badgeRoutes from "../modules/badge/badge.routes";
-import usersRoutes from "../modules/users/users.routes";
-import authRoutes from "../modules/auth/auth.routes";
-import { authMiddleware } from "../middleware/authentication.middleware";
+import authRoutes from "./auth.routes";
+import usersRoutes from "./users.routes";
+import workoutRoutes from "./workout.routes";
+import totalWorkoutRoutes from "./total-workout.routes";
+import badgeRoutes from "./badge.routes";
+import notificationRoutes from "./notification.routes";
+import { authMiddleware } from "../middlewares/authentication.middleware";
 
 const router = Router();
 
 router.use("/auth", authRoutes);
+router.use("/users", usersRoutes);
 router.use("/workouts", authMiddleware, workoutRoutes);
 router.use("/total-workouts", authMiddleware, totalWorkoutRoutes);
 router.use("/badges", authMiddleware, badgeRoutes);
-router.use("/users", usersRoutes);
+router.use("/notifications", authMiddleware, notificationRoutes);
 
 export default router;

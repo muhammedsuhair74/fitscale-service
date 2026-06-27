@@ -1,5 +1,6 @@
 import amqp from "amqplib";
-import { RABBITMQ_EXCHANGE, RABBITMQ_QUEUE_NAMES } from "../constants";
+import { RABBITMQ_EXCHANGE, RABBITMQ_QUEUE_NAMES } from "./constants";
+import bindQueuesToExchange from "./rabbitmq.utils";
 
 let channel: amqp.Channel | null = null;
 
@@ -16,17 +17,18 @@ export async function connectRabbit() {
   await channel.assertQueue(RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION, {
     durable: true,
   });
+  await channel.assertQueue(RABBITMQ_QUEUE_NAMES.NOTIFICATIONS, {
+    durable: true,
+  });
 
-  await channel.bindQueue(
-    RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
-    RABBITMQ_EXCHANGE,
-    "",
-  );
-  await channel.bindQueue(
-    RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION,
-    RABBITMQ_EXCHANGE,
-    "",
-  );
+  await bindQueuesToExchange({
+    arrayOfQueues: [
+      RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
+      RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION,
+      RABBITMQ_QUEUE_NAMES.NOTIFICATIONS,
+    ],
+    exchange: RABBITMQ_EXCHANGE,
+  });
 
   console.log("RabbitMQ Connected");
 }

@@ -6,12 +6,9 @@ import {
   refreshTokenService,
   setTokensService,
   getRefreshTokenRemainingSeconds,
-} from "./auth.services";
-import {
-  clearAuthCookies,
-  setAuthCookies,
-} from "./auth.utils";
-import { sanitizeUser } from "../../utils/user";
+} from "../services/auth.service";
+import { setAuthCookies, clearAuthCookies } from "../lib/auth.utils";
+import { sanitizeUser } from "../lib/user.utils";
 
 export const loginUserController = async (req: Request, res: Response) => {
   try {
@@ -23,7 +20,6 @@ export const loginUserController = async (req: Request, res: Response) => {
       message: "User logged in successfully",
     });
   } catch (error) {
-    console.error("Error logging in user:", (error as Error).message);
     res.status(401).json({
       message: (error as Error).message,
       success: false,
@@ -46,7 +42,6 @@ export const refreshTokenController = async (req: Request, res: Response) => {
       message: "Token refreshed successfully",
     });
   } catch (error) {
-    console.error("Error refreshing token:", (error as Error).message);
     res.status(401).json({
       message: (error as Error).message,
       success: false,

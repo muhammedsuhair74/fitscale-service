@@ -1,8 +1,8 @@
-import { prisma } from "../../lib/prisma";
 import { User, UserRoles } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { redis } from "../../lib/redis";
-import { cacheKeys, WORKOUT_CACHE_TTL_SECONDS } from "../../constants";
+import { userRepository } from "../repositories/user.repository";
+import { redis } from "../lib/redis";
+import { cacheKeys, WORKOUT_CACHE_TTL_SECONDS } from "../lib/constants";
 
 export const createUserService = async (
   email: string,
@@ -16,12 +16,10 @@ export const createUserService = async (
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        ...(role !== undefined && { role }),
-      },
+    const user = await userRepository.create({
+      email,
+      passwordHash,
+      ...(role !== undefined && { role }),
     });
     await redis.del(cacheKeys.allUsers);
     return user;
@@ -33,29 +31,18 @@ export const createUserService = async (
 export const getUsersService = async (): Promise<User[]> => {
   const cachedData = await redis.get(cacheKeys.allUsers);
   if (cachedData) {
-    console.log("Redis Hit");
     return JSON.parse(cachedData) as User[];
   }
 
-  console.log("Redis Miss");
-
-  try {
-    const data = await prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    await redis.set(cacheKeys.allUsers, JSON.stringify(data), {
-      EX: WORKOUT_CACHE_TTL_SECONDS,
-    });
-    return data;
-  } catch {
-    throw new Error("Failed to get users");
-  }
+  const data = await userRepository.findMany();
+  await redis.set(cacheKeys.allUsers, JSON.stringify(data), {
+    EX: WORKOUT_CACHE_TTL_SECONDS,
+  });
+  return data;
 };
 
 export const getUserByIdService = async (id: string): Promise<User> => {
-  const user = await prisma.user.findUnique({
-    where: { id },
-  });
+  const user = await userRepository.findById(id);
   if (!user) {
     throw new Error("User not found");
   }
@@ -63,9 +50,7 @@ export const getUserByIdService = async (id: string): Promise<User> => {
 };
 
 export const findUserByEmail = async (email: string): Promise<User | null> => {
-  return prisma.user.findUnique({
-    where: { email },
-  });
+  return userRepository.findByEmail(email);
 };
 
 export const getUserByEmailOrThrow = async (email: string): Promise<User> => {
@@ -88,13 +73,10 @@ export const updateUserByIdService = async ({
   role?: UserRoles;
 }): Promise<User> => {
   try {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        ...(email !== undefined && { email }),
-        ...(passwordHash !== undefined && { passwordHash }),
-        ...(role !== undefined && { role }),
-      },
+    const user = await userRepository.update(id, {
+      ...(email !== undefined && { email }),
+      ...(passwordHash !== undefined && { passwordHash }),
+      ...(role !== undefined && { role }),
     });
     await redis.del(cacheKeys.allUsers);
     return user;
@@ -105,9 +87,7 @@ export const updateUserByIdService = async ({
 
 export const deleteUserByIdService = async (id: string): Promise<void> => {
   try {
-    await prisma.user.delete({
-      where: { id },
-    });
+    await userRepository.delete(id);
     await redis.del(cacheKeys.allUsers);
   } catch {
     throw new Error("Failed to delete user by id");
@@ -116,13 +96,7 @@ export const deleteUserByIdService = async (id: string): Promise<void> => {
 
 export const deleteAllUsersService = async (): Promise<void> => {
   try {
-    await prisma.user.deleteMany({
-      where: {
-        role: {
-          not: UserRoles.ADMIN,
-        },
-      },
-    });
+    await userRepository.deleteManyNonAdmin();
     await redis.del(cacheKeys.allUsers);
   } catch {
     throw new Error("Failed to delete all users");

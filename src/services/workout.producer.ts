@@ -1,10 +1,10 @@
 import { WorkoutType } from "@prisma/client";
-import { getChannel } from "../../lib/rabbitmq";
+import { getChannel } from "../lib/rabbitmq";
 import {
   RABBITMQ_EXCHANGE,
   WorkoutEventPayload,
   WorkoutEventType,
-} from "../../constants";
+} from "../lib/constants";
 
 function publishWorkoutEvent(payload: WorkoutEventPayload) {
   const channel = getChannel();

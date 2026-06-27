@@ -7,17 +7,17 @@ import {
   getTotalWorkoutByIdController,
   getTotalWorkoutsController,
   updateTotalWorkoutController,
-} from "./total-workouts.controller";
-import { authorisationMiddleware } from "../../middleware/authorisation.middleware";
+} from "../controllers/total-workout.controller";
+import { authorisationMiddleware } from "../middlewares/authorisation.middleware";
 import {
   validateBody,
   validateParams,
-} from "../../middleware/validate.middleware";
+} from "../middlewares/validate.middleware";
 import {
   createTotalWorkoutSchema,
   totalWorkoutIdParamSchema,
   updateTotalWorkoutSchema,
-} from "../../validators/total-workouts.schema";
+} from "../validators/total-workouts.schema";
 
 const totalWorkoutRoutes = Router();
 

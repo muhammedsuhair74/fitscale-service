@@ -1,35 +1,19 @@
 import { Request, Response } from "express";
-import badgeService from "./badge.service";
-import { BadgeType, WorkoutType } from "@prisma/client";
-import { WorkoutEventPayload } from "../../constants";
+import { BadgeType } from "@prisma/client";
+import {
+  awardBadgeService,
+  deleteBadgeService,
+  getBadgeByIdService,
+  getBadgesByUserService,
+  updateBadgeService,
+} from "../services/badge.service";
 
-type AuthUser = {
-  userId: string;
-};
+type AuthUser = { userId: string };
 
-export async function handleBadgeWorkoutEvent(payload: WorkoutEventPayload) {
-  const typesToEvaluate = new Set<WorkoutType>([payload.workoutType]);
-
-  if (
-    payload.event === "updated" &&
-    payload.previousWorkoutType &&
-    payload.previousWorkoutType !== payload.workoutType
-  ) {
-    typesToEvaluate.add(payload.previousWorkoutType);
-  }
-
-  for (const workoutType of typesToEvaluate) {
-    await badgeService.evaluateBadgesForWorkoutType(
-      payload.userId,
-      workoutType,
-    );
-  }
-}
-
-const getBadgesController = async (req: Request, res: Response) => {
+export const getBadgesController = async (req: Request, res: Response) => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const badges = await badgeService.getBadgesByUserService(userId);
+    const badges = await getBadgesByUserService(userId);
     res.status(200).json({
       badges,
       success: true,
@@ -43,13 +27,10 @@ const getBadgesController = async (req: Request, res: Response) => {
   }
 };
 
-const getBadgeByIdController = async (req: Request, res: Response) => {
+export const getBadgeByIdController = async (req: Request, res: Response) => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const badge = await badgeService.getBadgeByIdService(
-      userId,
-      Number(req.params.id),
-    );
+    const badge = await getBadgeByIdService(userId, Number(req.params.id));
     res.status(200).json({
       badge,
       success: true,
@@ -63,13 +44,10 @@ const getBadgeByIdController = async (req: Request, res: Response) => {
   }
 };
 
-const awardBadgeController = async (req: Request, res: Response) => {
+export const awardBadgeController = async (req: Request, res: Response) => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const badge = await badgeService.awardBadgeService(
-      req.body.badgeType as BadgeType,
-      userId,
-    );
+    const badge = await awardBadgeService(req.body.badgeType as BadgeType, userId);
     res.status(201).json({
       badge,
       success: true,
@@ -83,10 +61,10 @@ const awardBadgeController = async (req: Request, res: Response) => {
   }
 };
 
-const deleteBadgeController = async (req: Request, res: Response) => {
+export const deleteBadgeController = async (req: Request, res: Response) => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    await badgeService.deleteBadgeService(userId, Number(req.params.id));
+    await deleteBadgeService(userId, Number(req.params.id));
     res.status(200).json({
       success: true,
       message: "Badge deleted successfully",
@@ -99,10 +77,10 @@ const deleteBadgeController = async (req: Request, res: Response) => {
   }
 };
 
-const updateBadgeController = async (req: Request, res: Response) => {
+export const updateBadgeController = async (req: Request, res: Response) => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const badge = await badgeService.updateBadgeService(
+    const badge = await updateBadgeService(
       userId,
       Number(req.params.id),
       req.body.badgeType as BadgeType,
@@ -118,12 +96,4 @@ const updateBadgeController = async (req: Request, res: Response) => {
       success: false,
     });
   }
-};
-
-export default {
-  getBadgesController,
-  getBadgeByIdController,
-  awardBadgeController,
-  updateBadgeController,
-  deleteBadgeController,
 };

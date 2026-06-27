@@ -5,11 +5,9 @@ import {
   editWorkoutService,
   getWorkoutByIdService,
   getWorkoutsService,
-} from "./workout.service";
+} from "../services/workout.service";
 
-type AuthUser = {
-  userId: string;
-};
+type AuthUser = { userId: string };
 
 export const createWorkoutController = async (
   req: Request,
@@ -58,8 +56,7 @@ export const getWorkoutByIdController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
-    const workout = await getWorkoutByIdService(userId, id as string);
+    const workout = await getWorkoutByIdService(userId, req.params.id as string);
     res.status(200).json({
       workout,
       success: true,
@@ -79,15 +76,13 @@ export const updateWorkoutController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
     const { workoutType, count } = req.body;
     const workout = await editWorkoutService(
       userId,
-      id as string,
+      req.params.id as string,
       workoutType,
       count,
     );
-
     res.status(200).json({
       workout,
       success: true,
@@ -107,9 +102,7 @@ export const deleteWorkoutController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const { id } = req.params;
-    await deleteWorkoutService(userId, id as string);
-
+    await deleteWorkoutService(userId, req.params.id as string);
     res.status(200).json({
       success: true,
       message: "Workout deleted successfully",

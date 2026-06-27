@@ -4,85 +4,111 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client-js"
+ provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+ provider = "postgresql"
 }
 
 enum UserRoles {
-  ADMIN
-  TRAINER
-  USER
+ ADMIN
+ TRAINER
+ USER
 }
 
 enum WorkoutType {
-  PUSHUP
-  SQUAT
-  SITUP
-  PLANK
+ PUSHUP
+ SQUAT
+ SITUP
+ PLANK
 }
 
 enum BadgeType {
-  BRONZE_PUSHUP
-  SILVER_PUSHUP
-  GOLD_PUSHUP
+ BRONZE_PUSHUP
+ SILVER_PUSHUP
+ GOLD_PUSHUP
 
-  BRONZE_SQUAT
-  SILVER_SQUAT
-  GOLD_SQUAT
+ BRONZE_SQUAT
+ SILVER_SQUAT
+ GOLD_SQUAT
 
-  BRONZE_SITUP
-  SILVER_SITUP
-  GOLD_SITUP
+ BRONZE_SITUP
+ SILVER_SITUP
+ GOLD_SITUP
 
-  BRONZE_PLANK
-  SILVER_PLANK
-  GOLD_PLANK
+ BRONZE_PLANK
+ SILVER_PLANK
+ GOLD_PLANK
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  BADGE
+  LEADERBOARD
 }
 
 model User {
-  id String @id @default(uuid())
-  email String @unique
-  passwordHash String
-  role UserRoles @default(USER)
-  token String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  workouts Workout[]
-  badges Badge[]
+ id String @id @default(uuid())
+ email String @unique
+ passwordHash String
+ role UserRoles @default(USER)
+ token String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+
+ workouts Workout[]
+ badges Badge[]
+ notification Notification[]
+
 }
 
 model Workout {
-  id String @id @default(uuid())
-  userId String
-  workoutType WorkoutType
-  count Int
-  createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id])
+ id String @id @default(uuid())
+ userId String
+ workoutType WorkoutType
+ count Int
+ createdAt DateTime @default(now())
+ 
+ user User @relation(fields: [userId], references: [id])
 
-  @@index([userId, createdAt])
-  @@index([userId, workoutType, createdAt])
+ @@index([userId, createdAt])
+ @@index([userId, workoutType, createdAt])
 }
 
 model Badge {
-  id Int @id @default(autoincrement())
-  userId String
-  badgeType BadgeType
-  awardedAt DateTime @default(now())
+ id Int @id @default(autoincrement())
+ userId String
+ badgeType BadgeType
+ awardedAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+ user User @relation(fields: [userId], references: [id])
 
-  @@unique([userId, badgeType])
+ @@unique([userId, badgeType])
 }
 
 model TotalWorkouts {
-  id Int @id @default(autoincrement())
-  userId String
-  workoutType WorkoutType
-  totalCount Int
+ id Int @id @default(autoincrement())
+ userId String
+ workoutType WorkoutType
+ totalCount Int
 
-  @@unique([userId, workoutType])
+ @@unique([userId, workoutType])
+}
+
+model Notification {
+ id Int @id @default(autoincrement())
+ userId String
+ title String
+ message String
+ type NotificationType
+ isRead Boolean @default(false)
+ createdAt DateTime @default(now())
+
+ user User @relation(fields: [userId], references: [id])
+
+ @@index([userId, isRead])
+ @@index([createdAt])
 }

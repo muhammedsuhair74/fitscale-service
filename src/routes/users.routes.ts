@@ -7,21 +7,21 @@ import {
   updateUserByIdController,
   deleteUserByIdController,
   deleteAllUsersController,
-} from "./users.controllers";
+} from "../controllers/users.controller";
 import {
   authorisationMiddleware,
   ownerOrAdminMiddleware,
-} from "../../middleware/authorisation.middleware";
+} from "../middlewares/authorisation.middleware";
 import {
   validateBody,
   validateParams,
-} from "../../middleware/validate.middleware";
+} from "../middlewares/validate.middleware";
 import {
   createUserSchema,
   updateUserSchema,
   userIdParamSchema,
-} from "../../validators/users.schema";
-import { authMiddleware } from "../../middleware/authentication.middleware";
+} from "../validators/users.schema";
+import { authMiddleware } from "../middlewares/authentication.middleware";
 
 const usersRoutes = Router();
 
@@ -47,7 +47,6 @@ usersRoutes.put(
   validateBody(updateUserSchema),
   updateUserByIdController,
 );
-
 usersRoutes.delete(
   "/:id",
   validateParams(userIdParamSchema),
@@ -55,11 +54,11 @@ usersRoutes.delete(
   ownerOrAdminMiddleware,
   deleteUserByIdController,
 );
-export default usersRoutes;
-
 usersRoutes.delete(
   "/",
   authMiddleware,
   authorisationMiddleware(UserRoles.ADMIN),
   deleteAllUsersController,
 );
+
+export default usersRoutes;

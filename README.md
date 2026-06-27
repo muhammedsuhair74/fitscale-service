@@ -248,8 +248,8 @@ Redis has a healthcheck in Compose. The `api` service waits for Redis to be heal
 RabbitMQ handles async workout events. When a workout is created, the API publishes a message to the `workout-created` queue. Badge workers consume that queue to award badges.
 
 - Client: `src/lib/rabbitmq.ts`
-- Producer: `src/modules/workouts/workout.producer.ts`
-- Consumer: `src/modules/badge/workers/badge.worker.ts`
+- Producer: `src/services/workout.producer.ts`
+- Consumer: `src/lib/workers/badge.worker.ts`
 
 On startup, `connectRabbit()` in `src/server.ts` connects and asserts the `workout-created` queue.
 
@@ -727,32 +727,31 @@ Login first — Postman sends cookies automatically on subsequent requests.
 
 ```
 src/
-  server.ts                          # Entry point — middleware, routes, startup
+  server.ts
+  controllers/                       # Request handlers (auth, users, workouts, badges, …)
+  routes/                            # Express route definitions + index.ts
+  services/                          # Business logic + workout.producer.ts
+  repositories/                      # Prisma data access layer
+  validators/                        # Zod schemas
+  middlewares/                       # Auth, authorization, validation, logging
   lib/
     prisma.ts                        # Prisma client (pg adapter)
-    redis.ts                         # Redis client (connects on import)
-    rabbitmq.ts                      # RabbitMQ connection + queue setup
-  middleware/
-    authentication.middleware.ts     # JWT cookie verification
-    authorisation.middleware.ts      # Role + owner checks
-    validate.middleware.ts           # Zod request validation
-  routes/
-    index.ts                         # Mounts /auth, /users, /workouts
-  modules/
-    auth/                            # Register, login, refresh, logout
-    users/                           # User CRUD
-    workouts/                        # Workout create / list + queue producer
-    badge/                           # Badge routes + RabbitMQ consumer worker
-  validators/                        # Zod schemas
-  utils/
-    user.ts                          # Sanitize user objects
+    redis.ts                         # Redis client
+    cache.ts                         # Redis cache helpers
+    rabbitmq.ts                      # RabbitMQ connection + exchange setup
+    constants.ts                     # Cache keys, RabbitMQ config, event types
+    auth.utils.ts                    # Cookie helpers
+    user.utils.ts                    # Sanitize user objects
+    consumers.ts                     # Starts all RabbitMQ consumers
+    total-workout.consumer.ts        # Syncs TotalWorkouts from events
+    workers/badge.worker.ts          # Badge evaluation worker
 nginx/
-  nginx.conf                         # Reverse proxy config (Docker)
+  nginx.conf
 prisma/
-  schema.prisma                      # Database schema
-  migrations/                        # Versioned SQL migrations
-docker-compose.yml                   # Multi-service stack
-Dockerfile                           # Multi-stage API image
+  schema.prisma
+  migrations/
+docker-compose.yml
+Dockerfile
 ```
 
 ---

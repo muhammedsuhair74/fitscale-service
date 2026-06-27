@@ -18,9 +18,10 @@ export const cacheKeys = {
   totalWorkoutsByUserId: (userId: string) => `total-workouts-by-user-${userId}`,
 };
 
-export const RABBITMQ_EXCHANGE = "workout-events";
+export const RABBITMQ_EXCHANGE = "workout-created-exchange";
 
 export const RABBITMQ_QUEUE_NAMES = {
+  NOTIFICATIONS: "notifications",
   TOTAL_WORKOUTS_SYNC: "total-workouts-sync",
   BADGE_EVALUATION: "badge-evaluation",
 };

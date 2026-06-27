@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { UserRoles } from "@prisma/client";
+import { hash } from "bcrypt";
 import {
   createUserService,
   getUsersService,
@@ -8,9 +9,8 @@ import {
   updateUserByIdService,
   deleteUserByIdService,
   deleteAllUsersService,
-} from "./users.service";
-import { hash } from "bcrypt";
-import { sanitizeUser, sanitizeUsers } from "../../utils/user";
+} from "../services/users.service";
+import { sanitizeUser, sanitizeUsers } from "../lib/user.utils";
 
 export const createUserController = async (
   req: Request,
@@ -57,28 +57,6 @@ export const getUserByIdController = async (
 ): Promise<void> => {
   try {
     const user = await getUserByIdService(req.params.id as string);
-    res.status(200).json({
-      user: sanitizeUser(user),
-      success: true,
-      message: "User fetched successfully",
-    });
-  } catch (error) {
-    res.status(404).json({
-      message: (error as Error).message,
-      success: false,
-    });
-  }
-};
-
-export const getUserByEmailController = async (
-  req: Request,
-  res: Response,
-): Promise<void> => {
-  try {
-    const user = await findUserByEmail(req.body.email);
-    if (!user) {
-      throw new Error("User not found");
-    }
     res.status(200).json({
       user: sanitizeUser(user),
       success: true,
