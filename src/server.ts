@@ -4,12 +4,15 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import http from "http";
 
 import "./lib/redis";
 import router from "./routes/index";
 import { performanceLogger } from "./middlewares/performance.middleware";
 import { connectRabbit } from "./lib/rabbitmq";
 import startConsumers from "./lib/consumers";
+import { errorMiddleware } from "./middlewares/error.middleware";
+import { initializeSocket } from "./socket";
 
 const app = express();
 app.use(helmet());
@@ -41,19 +44,20 @@ const PORT = process.env.PORT || 5001;
 
 async function startServer() {
   await connectRabbit();
+
   startConsumers();
 
-  app
-    .listen(PORT, () => {
-      console.log(`Server running on ${PORT}`);
-    })
-    .on("error", (err) => {
-      console.error(err);
-      process.exit(1);
-    });
+  const server = http.createServer(app);
+  initializeSocket(server);
+
+  server.listen(PORT, () => {
+    console.log(`Server running on ${PORT}`);
+  });
 }
 
 startServer().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+app.use(errorMiddleware);

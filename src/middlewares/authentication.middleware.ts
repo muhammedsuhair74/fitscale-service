@@ -1,5 +1,5 @@
-import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
+import { verifyAccessToken } from "../utils/jwt";
 
 export function authMiddleware(
   req: Request,
@@ -16,7 +16,7 @@ export function authMiddleware(
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    const decoded = verifyAccessToken(token);
     (req as any).user = decoded;
     next();
   } catch {

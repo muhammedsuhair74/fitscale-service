@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import { JwtPayload } from "jsonwebtoken";
 import { User } from "@prisma/client";
 import { userRepository } from "../repositories/user.repository";
 import {
@@ -7,20 +7,22 @@ import {
   getUserByEmailOrThrow,
   getUserByIdService,
 } from "./users.service";
+import {
+  ACCESS_TOKEN_EXPIRY_SECONDS,
+  decodeRefreshToken,
+  generateAccessToken,
+  generateRefreshToken,
+  REFRESH_TOKEN_EXPIRY_SECONDS,
+  verifyRefreshToken,
+} from "../utils/jwt";
 
-const ACCESS_TOKEN_EXPIRY_SECONDS = 60 * 60;
-const REFRESH_TOKEN_EXPIRY_SECONDS = 7 * 24 * 60 * 60;
-
-const verifyRefreshToken = (refreshToken: string): JwtPayload => {
+export const verifyRefreshTokenService = (refreshToken: string): JwtPayload => {
   if (!refreshToken) {
     throw new Error("Refresh token not found");
   }
 
   try {
-    const payload = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET as string,
-    ) as JwtPayload;
+    const payload = verifyRefreshToken(refreshToken) as JwtPayload;
 
     if (!payload.userId) {
       throw new Error("Invalid refresh token");
@@ -35,7 +37,7 @@ const verifyRefreshToken = (refreshToken: string): JwtPayload => {
 export const getRefreshTokenRemainingSeconds = (
   refreshToken: string,
 ): number => {
-  const { exp } = verifyRefreshToken(refreshToken);
+  const { exp } = decodeRefreshToken(refreshToken) as JwtPayload;
   if (!exp) {
     return REFRESH_TOKEN_EXPIRY_SECONDS;
   }
@@ -58,16 +60,8 @@ export const setTokensService = async (
   refreshTokenExpirySeconds: number = REFRESH_TOKEN_EXPIRY_SECONDS,
   accessTokenExpirySeconds: number = ACCESS_TOKEN_EXPIRY_SECONDS,
 ) => {
-  const accessToken = jwt.sign(
-    { userId: user.id, role: user.role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: accessTokenExpirySeconds },
-  );
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    process.env.JWT_REFRESH_SECRET as string,
-    { expiresIn: refreshTokenExpirySeconds },
-  );
+  const accessToken = generateAccessToken({ userId: user.id, role: user.role });
+  const refreshToken = generateRefreshToken({ userId: user.id });
   await userRepository.update(user.id, { token: refreshToken });
   return {
     accessToken,
@@ -78,7 +72,7 @@ export const setTokensService = async (
 };
 
 export const refreshTokenService = async (refreshToken: string) => {
-  const { userId } = verifyRefreshToken(refreshToken);
+  const { userId } = verifyRefreshToken(refreshToken) as JwtPayload;
   const user = await getUserByIdService(userId as string);
 
   if (user.token !== refreshToken) {
@@ -93,8 +87,12 @@ export const refreshTokenService = async (refreshToken: string) => {
 };
 
 export const logoutUserService = async (refreshToken: string) => {
-  const { userId } = verifyRefreshToken(refreshToken);
-  await userRepository.update(userId as string, { token: null });
+  const decoded = decodeRefreshToken(refreshToken) as JwtPayload;
+  const userId = decoded.userId as string;
+  if (!userId) {
+    throw new Error("Invalid refresh token");
+  }
+  await userRepository.update(userId, { token: null });
   return {
     success: true,
     message: "User logged out successfully",

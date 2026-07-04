@@ -7,7 +7,7 @@ import {
   publishWorkoutCreated,
   publishWorkoutDeleted,
   publishWorkoutUpdated,
-} from "./workout.producer";
+} from "../events/publishers/workout.publisher";
 
 async function invalidateWorkoutCaches(userId: string) {
   await redis.del(cacheKeys.allWorkouts);
@@ -43,7 +43,11 @@ export const createWorkoutService = async (
   workoutType: WorkoutType,
   count: number,
 ): Promise<Workout> => {
-  const workout = await workoutRepository.create({ userId, workoutType, count });
+  const workout = await workoutRepository.create({
+    userId,
+    workoutType,
+    count,
+  });
   await invalidateWorkoutCaches(userId);
   publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;

@@ -7,14 +7,19 @@ export const createNotificationService = async (
   message: string,
   type: NotificationType,
 ) => {
-  return notificationRepository.create({ userId, title, message, type });
+  return notificationRepository.createNotificationRepository({
+    userId,
+    title,
+    message,
+    type,
+  });
 };
 
 export const markNotificationAsReadService = async (
   userId: string,
   id: number,
 ) => {
-  const notification = await notificationRepository.markAsRead(id);
+  const notification = await notificationRepository.markAsReadRepository(id);
   if (notification.userId !== userId) {
     throw new Error("Notification not found");
   }
@@ -22,5 +27,5 @@ export const markNotificationAsReadService = async (
 };
 
 export const getUnreadNotificationsService = async (userId: string) => {
-  return notificationRepository.findUnreadByUserId(userId);
+  return notificationRepository.findUnreadByUserIdRepository(userId);
 };

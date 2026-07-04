@@ -1,5 +1,5 @@
-import { startTotalWorkoutsConsumer } from "./total-workout.consumer";
-import { startBadgeWorker } from "./workers/badge.worker";
+import { startTotalWorkoutsConsumer } from "../events/consumers/total-workout.consumer";
+import { startBadgeWorker } from "../events/consumers/badge.consumer";
 
 const startConsumers = () => {
   startTotalWorkoutsConsumer();

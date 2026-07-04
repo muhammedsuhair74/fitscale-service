@@ -2,7 +2,7 @@ import { NotificationType } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 export const notificationRepository = {
-  create(data: {
+  createNotificationRepository(data: {
     userId: string;
     title: string;
     message: string;
@@ -11,14 +11,21 @@ export const notificationRepository = {
     return prisma.notification.create({ data });
   },
 
-  markAsRead(id: number) {
+  findNotificationsRepository(userId: string) {
+    return prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  markAsReadRepository(id: number) {
     return prisma.notification.update({
       where: { id },
       data: { isRead: true },
     });
   },
 
-  findUnreadByUserId(userId: string) {
+  findUnreadByUserIdRepository(userId: string) {
     return prisma.notification.findMany({
       where: { userId, isRead: false },
       orderBy: { createdAt: "desc" },
