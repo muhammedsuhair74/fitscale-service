@@ -13,14 +13,16 @@ export function startBadgeWorker() {
         message.content.toString(),
       ) as WorkoutEventPayload;
 
-      console.log("Badge worker:", payload.event, payload);
       await handleBadgeWorkoutEvent(payload);
+      channel.sendToQueue(
+        RABBITMQ_QUEUE_NAMES.NOTIFICATIONS,
+        Buffer.from(JSON.stringify(payload)),
+        { persistent: true },
+      );
       channel.ack(message);
     } catch (error) {
       console.error("Badge worker error:", error);
       channel.nack(message, false, true);
     }
   });
-
-  console.log("Badge worker started");
 }

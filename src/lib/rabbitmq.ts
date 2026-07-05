@@ -22,11 +22,7 @@ export async function connectRabbit() {
   });
 
   await bindQueuesToExchange({
-    arrayOfQueues: [
-      RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
-      RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION,
-      RABBITMQ_QUEUE_NAMES.NOTIFICATIONS,
-    ],
+    arrayOfQueues: [RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC],
     exchange: RABBITMQ_EXCHANGE,
   });
 

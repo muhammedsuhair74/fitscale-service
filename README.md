@@ -245,13 +245,180 @@ Redis has a healthcheck in Compose. The `api` service waits for Redis to be heal
 
 ### What RabbitMQ is used for
 
-RabbitMQ handles async workout events. When a workout is created, the API publishes a message to the `workout-created` queue. Badge workers consume that queue to award badges.
+RabbitMQ handles async workout events (create / update / delete). After a workout is saved, the API publishes an event so workers can sync totals, evaluate badges, and send notifications without blocking the HTTP response.
 
-- Client: `src/lib/rabbitmq.ts`
-- Producer: `src/services/workout.producer.ts`
-- Consumer: `src/lib/workers/badge.worker.ts`
+| Piece | Path |
+| ----- | ---- |
+| Connection + setup | `src/lib/rabbitmq.ts` |
+| Constants (exchange, queues, payload type) | `src/lib/constants.ts` |
+| Publisher | `src/events/publishers/workout.publisher.ts` |
+| Consumers | `src/events/consumers/` (`total-workout`, `badge`, `notification`) |
+| Consumer startup | `src/lib/consumers.ts` |
 
-On startup, `connectRabbit()` in `src/server.ts` connects and asserts the `workout-created` queue.
+On startup, `connectRabbit()` in `src/server.ts` asserts the exchange and queues; `startConsumers()` registers workers.
+
+**Exchange:** `workout-created-exchange` (fanout)
+
+**Queues:**
+
+| Queue | Purpose |
+| ----- | ------- |
+| `total-workouts-sync` | Sync `TotalWorkouts` counts from workout events |
+| `badge-evaluation` | Award badges based on totals |
+| `notifications` | Push real-time notifications via Socket.IO |
+
+> **Important:** `total-workouts-sync` must **not** be bound to the fanout exchange if the sync consumer republishes to that exchange after syncing — otherwise messages loop forever. Only downstream queues (`badge-evaluation`, `notifications`) should be bound.
+
+### Intended event pipeline
+
+```
+API (workout.service)
+    │
+    │  sendToQueue("total-workouts-sync")
+    ▼
+total-workouts-sync consumer
+    │  syncTotalWorkoutCountService()
+    │  publish("workout-created-exchange")
+    ▼
+workout-created-exchange (fanout)
+    ├──► badge-evaluation      → badge.consumer
+    └──► notifications         → notification.consumer
+```
+
+### amqplib cheat sheet
+
+#### Core concepts
+
+| Term | Role |
+| ---- | ---- |
+| **Exchange** | Router — receives messages and forwards them to queues based on type + routing key |
+| **Queue** | Buffer — stores messages until a consumer reads them |
+| **Binding** | Link between exchange and queue (`bindQueue`) |
+| **Consumer** | Worker that reads from a **queue** (never from an exchange directly) |
+
+#### Setup (run once at startup)
+
+```typescript
+const connection = await amqp.connect("amqp://guest:guest@localhost:5672");
+const channel = await connection.createChannel();
+
+await channel.assertExchange("workout-created-exchange", "fanout", { durable: true });
+await channel.assertQueue("total-workouts-sync", { durable: true });
+await channel.assertQueue("badge-evaluation", { durable: true });
+await channel.bindQueue("badge-evaluation", "workout-created-exchange", "");
+```
+
+Exchange types:
+
+| Type | Use case |
+| ---- | -------- |
+| `fanout` | Broadcast to all bound queues (Fitscale exchange) |
+| `direct` | Route by exact routing key |
+| `topic` | Route by pattern (`workout.*`) |
+| `headers` | Route by message headers |
+
+#### Send events (produce)
+
+**1. `channel.sendToQueue(queueName, buffer, options)`** — direct to one queue (bypasses exchange):
+
+```typescript
+channel.sendToQueue(
+  "total-workouts-sync",
+  Buffer.from(JSON.stringify(payload)),
+  { persistent: true },
+);
+```
+
+Use when one specific worker should handle the message (e.g. sync totals first).
+
+**2. `channel.publish(exchange, routingKey, buffer, options)`** — to an exchange; RabbitMQ routes to bound queues:
+
+```typescript
+channel.publish(
+  "workout-created-exchange",
+  "",  // fanout ignores routing key
+  Buffer.from(JSON.stringify(payload)),
+  { persistent: true },
+);
+```
+
+Use when one event should fan out to multiple consumers (badge + notifications).
+
+| | `sendToQueue` | `publish` |
+| --- | ------------- | --------- |
+| Target | One queue | Exchange → many queues |
+| Routing | Direct | Via bindings + routing key |
+| Fitscale example | Step 1: sync queue | Step 2: after sync, notify badge/notifications |
+
+#### Consume events
+
+**`channel.consume(queueName, callback, options?)`**
+
+```typescript
+channel.consume("badge-evaluation", async (message) => {
+  if (!message) return;
+
+  try {
+    const payload = JSON.parse(message.content.toString());
+    await handleBadgeWorkoutEvent(payload);
+    channel.ack(message);
+  } catch (error) {
+    channel.nack(message, false, true);
+  }
+});
+```
+
+Useful options:
+
+```typescript
+channel.prefetch(1);
+channel.consume("badge-evaluation", handler, { noAck: false });
+```
+
+**Acknowledgement methods**
+
+| Method | Meaning |
+| ------ | ------- |
+| `channel.ack(message)` | Processed OK — remove from queue |
+| `channel.nack(message, false, true)` | Failed — requeue for retry |
+| `channel.nack(message, false, false)` | Failed — discard (or dead-letter) |
+| `channel.reject(message, requeue)` | Nack for a single message |
+
+#### Rules of thumb
+
+| I want to… | Method |
+| ---------- | ------ |
+| Send to one worker | `sendToQueue(queue, buffer, opts)` |
+| Broadcast to many workers | `publish(exchange, routingKey, buffer, opts)` |
+| Read messages | `consume(queue, callback)` |
+| Confirm success | `ack(message)` |
+| Retry on failure | `nack(message, false, true)` |
+| Link exchange → queue | `bindQueue(queue, exchange, routingKey)` |
+| Remove a bad binding | `unbindQueue(queue, exchange, routingKey)` |
+
+Always **consume from a queue**, never from an exchange name:
+
+```typescript
+// WRONG
+channel.consume(RABBITMQ_EXCHANGE, ...);
+
+// CORRECT
+channel.consume(RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION, ...);
+```
+
+#### Workout event payload
+
+```typescript
+{
+  event: "created" | "updated" | "deleted",
+  workoutId: string,
+  userId: string,
+  workoutType: "PUSHUP" | "SQUAT" | "SITUP" | "PLANK",
+  previousWorkoutType?: string  // only on "updated"
+}
+```
+
+Serialize with `Buffer.from(JSON.stringify(payload))` and parse with `JSON.parse(message.content.toString())`.
 
 ### Connection details
 
@@ -730,7 +897,10 @@ src/
   server.ts
   controllers/                       # Request handlers (auth, users, workouts, badges, …)
   routes/                            # Express route definitions + index.ts
-  services/                          # Business logic + workout.producer.ts
+  services/                          # Business logic
+  events/
+    publishers/workout.publisher.ts  # Publishes workout events to RabbitMQ
+    consumers/                       # total-workout, badge, notification workers
   repositories/                      # Prisma data access layer
   validators/                        # Zod schemas
   middlewares/                       # Auth, authorization, validation, logging
@@ -739,12 +909,11 @@ src/
     redis.ts                         # Redis client
     cache.ts                         # Redis cache helpers
     rabbitmq.ts                      # RabbitMQ connection + exchange setup
+    rabbitmq.utils.ts                # bindQueuesToExchange helper
     constants.ts                     # Cache keys, RabbitMQ config, event types
     auth.utils.ts                    # Cookie helpers
     user.utils.ts                    # Sanitize user objects
     consumers.ts                     # Starts all RabbitMQ consumers
-    total-workout.consumer.ts        # Syncs TotalWorkouts from events
-    workers/badge.worker.ts          # Badge evaluation worker
 nginx/
   nginx.conf
 prisma/
@@ -765,6 +934,8 @@ Dockerfile
 | `Redis Connected` never appears | Ensure `import "./lib/redis"` is in `server.ts` and Redis is running |
 | `AggregateError` right after `Server running on 5001` | RabbitMQ is not running or wrong port. Run `docker compose up rabbitmq -d` and confirm port **5672** (`nc -zv localhost 5672`) |
 | `RabbitMQ Connected` never appears | Start RabbitMQ before `npm run dev`. Check `docker compose ps` |
+| Same workout processed hundreds of times | Stale binding: `total-workouts-sync` bound to exchange while consumer republishes after sync. Unbind with Management UI or purge queues; see [RabbitMQ](#rabbitmq) |
+| `NOT_FOUND - no queue 'workout-created-exchange'` | `consume()` must use a **queue** name, not the exchange name |
 | RabbitMQ port conflict on `5672` | Something else is using 5672: `lsof -i :5672`. Stop that process or change the host port in `docker-compose.yml` **and** update `src/lib/rabbitmq.ts` to match |
 | `docker run fitscale-backend-redis-1` fails | That is a container name, not an image. Use `docker compose up redis -d` instead |
 | `EADDRINUSE` on port 5001 | Another process (often a previous `npm run dev`) is using the port: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` or use a different `PORT` in `.env` |

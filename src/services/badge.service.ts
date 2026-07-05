@@ -114,6 +114,7 @@ export async function evaluateBadgesForWorkoutType(
   if (total >= thresholds.gold) {
     await awardBadgeService(badgeTypes.gold, userId);
   }
+  return true;
 }
 
 export async function evaluateAllBadges(userId: string) {
@@ -137,4 +138,5 @@ export async function handleBadgeWorkoutEvent(payload: WorkoutEventPayload) {
   for (const workoutType of typesToEvaluate) {
     await evaluateBadgesForWorkoutType(payload.userId, workoutType);
   }
+  return true;
 }

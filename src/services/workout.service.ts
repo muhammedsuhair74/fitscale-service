@@ -3,16 +3,17 @@ import { workoutRepository } from "../repositories/workout.repository";
 import { redis } from "../lib/redis";
 import { cacheKeys } from "../lib/constants";
 import { getCache, setCache } from "../lib/cache";
+import { invalidateWorkoutCaches } from "../redis/invalidate";
 import {
   publishWorkoutCreated,
   publishWorkoutDeleted,
   publishWorkoutUpdated,
 } from "../events/publishers/workout.publisher";
 
-async function invalidateWorkoutCaches(userId: string) {
-  await redis.del(cacheKeys.allWorkouts);
-  await redis.del(cacheKeys.workoutsByUserId(userId));
-}
+export const invalidateWorkoutCachesKeys = (userId: string) => [
+  cacheKeys.allWorkouts,
+  cacheKeys.workoutsByUserId(userId),
+];
 
 export const getWorkoutsService = async (
   userId: string,
@@ -48,7 +49,8 @@ export const createWorkoutService = async (
     workoutType,
     count,
   });
-  await invalidateWorkoutCaches(userId);
+
+  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
   publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;
 };
@@ -79,7 +81,7 @@ export const editWorkoutService = async (
   }
 
   const workout = await workoutRepository.update(id, { workoutType, count });
-  await invalidateWorkoutCaches(userId);
+  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
   publishWorkoutUpdated(
     workout.id,
     workout.userId,
@@ -102,7 +104,7 @@ export const deleteWorkoutService = async (
   }
 
   await workoutRepository.delete(id);
-  await invalidateWorkoutCaches(userId);
+  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
   publishWorkoutDeleted(
     existingWorkout.id,
     existingWorkout.userId,

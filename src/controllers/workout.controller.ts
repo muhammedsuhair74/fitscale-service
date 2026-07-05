@@ -56,7 +56,10 @@ export const getWorkoutByIdController = async (
 ): Promise<void> => {
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
-    const workout = await getWorkoutByIdService(userId, req.params.id as string);
+    const workout = await getWorkoutByIdService(
+      userId,
+      req.params.id as string,
+    );
     res.status(200).json({
       workout,
       success: true,

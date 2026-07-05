@@ -42,8 +42,12 @@ export const getTotalWorkoutByIdService = async (
   return totalWorkout;
 };
 
-export const getAllTotalWorkoutsService = async (): Promise<TotalWorkouts[]> => {
-  const cachedData = await getCache<TotalWorkouts[]>(cacheKeys.allTotalWorkouts);
+export const getAllTotalWorkoutsService = async (): Promise<
+  TotalWorkouts[]
+> => {
+  const cachedData = await getCache<TotalWorkouts[]>(
+    cacheKeys.allTotalWorkouts,
+  );
   if (cachedData) {
     return cachedData;
   }
@@ -121,7 +125,10 @@ export const syncTotalWorkoutCountService = async (
 ): Promise<TotalWorkouts | null> => {
   const result = await workoutRepository.aggregateCount(userId, workoutType);
   const totalCount = result._sum.count ?? 0;
-  const existing = await getTotalWorkoutByUserAndTypeService(userId, workoutType);
+  const existing = await getTotalWorkoutByUserAndTypeService(
+    userId,
+    workoutType,
+  );
 
   if (totalCount === 0) {
     if (existing) {

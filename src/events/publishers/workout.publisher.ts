@@ -1,17 +1,19 @@
 import { WorkoutType } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
 import {
-  RABBITMQ_EXCHANGE,
+  RABBITMQ_QUEUE_NAMES,
   WorkoutEventPayload,
   WorkoutEventType,
 } from "../../lib/constants";
 
-function publishWorkoutEvent(payload: WorkoutEventPayload) {
+function enqueueWorkoutSync(payload: WorkoutEventPayload) {
   const channel = getChannel();
-  console.log("Publishing workout event", payload);
-  channel.publish(RABBITMQ_EXCHANGE, "", Buffer.from(JSON.stringify(payload)), {
-    persistent: true,
-  });
+  console.log("Enqueueing workout sync", payload);
+  channel.sendToQueue(
+    RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
+    Buffer.from(JSON.stringify(payload)),
+    { persistent: true },
+  );
 }
 
 export function publishWorkoutCreated(
@@ -19,7 +21,7 @@ export function publishWorkoutCreated(
   userId: string,
   workoutType: WorkoutType,
 ) {
-  publishWorkoutEvent({
+  enqueueWorkoutSync({
     event: "created",
     workoutId,
     userId,
@@ -33,7 +35,7 @@ export function publishWorkoutUpdated(
   workoutType: WorkoutType,
   previousWorkoutType: WorkoutType,
 ) {
-  publishWorkoutEvent({
+  enqueueWorkoutSync({
     event: "updated",
     workoutId,
     userId,
@@ -47,7 +49,7 @@ export function publishWorkoutDeleted(
   userId: string,
   workoutType: WorkoutType,
 ) {
-  publishWorkoutEvent({
+  enqueueWorkoutSync({
     event: "deleted",
     workoutId,
     userId,

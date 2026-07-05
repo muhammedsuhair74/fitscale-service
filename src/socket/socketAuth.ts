@@ -24,10 +24,10 @@ export function socketAuth(socket: Socket, next: (err?: Error) => void) {
 
     const payload = verifyAccessToken(accessToken);
 
-    socket.user = {
+    socket.data.user = {
       id: payload.userId,
       role: payload.role,
-    } as AuthenticatedUser;
+    };
 
     next();
   } catch {
