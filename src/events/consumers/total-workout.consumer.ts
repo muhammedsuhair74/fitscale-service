@@ -17,7 +17,6 @@ export function startTotalWorkoutsConsumer() {
         message.content.toString(),
       ) as WorkoutEventPayload;
 
-      console.log("Total workouts consumer:", payload.event, payload);
       await syncTotalWorkoutCountService(payload.userId, payload.workoutType);
 
       channel.sendToQueue(
@@ -34,6 +33,4 @@ export function startTotalWorkoutsConsumer() {
       channel.nack(message, false, true);
     }
   });
-
-  console.log("Total workouts consumer started");
 }

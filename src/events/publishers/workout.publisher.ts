@@ -8,7 +8,6 @@ import {
 
 function enqueueWorkoutSync(payload: WorkoutEventPayload) {
   const channel = getChannel();
-  console.log("Enqueueing workout sync", payload);
   channel.sendToQueue(
     RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
     Buffer.from(JSON.stringify(payload)),
