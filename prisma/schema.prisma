@@ -24,6 +24,12 @@ enum WorkoutType {
  PLANK
 }
 
+enum OutBoxStatusTypes {
+  PENDING
+  INPROGRESS
+  DONE
+}
+
 enum BadgeType {
  BRONZE_PUSHUP
  SILVER_PUSHUP
@@ -76,6 +82,28 @@ model Workout {
 
  @@index([userId, createdAt])
  @@index([userId, workoutType, createdAt])
+}
+
+model WorkoutOutbox {
+  id String @id @default(uuid())
+  eventId String @unique
+  eventType String
+  aggregateId String
+  aggregateType String
+  correlationId String?
+  causationId String?
+  payload Json
+  status OutBoxStatusTypes
+  createdAt DateTime @default(now())
+  publishedAt DateTime?
+  retryCount Int @default(0)
+  lastError String?
+}
+
+model TotalWorkoutIdempotency {
+  id String @id @default(uuid())
+  eventId String @unique
+  processedAt DateTime @default(now())
 }
 
 model Badge {

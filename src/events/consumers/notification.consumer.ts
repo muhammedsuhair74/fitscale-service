@@ -1,4 +1,4 @@
-import { emitNotification } from "../../socket/sockerEmitter";
+import { emitNotification } from "../../socket/socketEmitter";
 import { getChannel } from "../../lib/rabbitmq";
 import { RABBITMQ_QUEUE_NAMES } from "../../lib/constants";
 
