@@ -1,10 +1,10 @@
 import { Router } from "express";
-import authRoutes from "./auth.routes";
-import usersRoutes from "./users.routes";
-import workoutRoutes from "./workout.routes";
-import totalWorkoutRoutes from "./total-workout.routes";
-import badgeRoutes from "./badge.routes";
-import notificationRoutes from "./notification.routes";
+import authRoutes from "./authentication/auth.routes";
+import usersRoutes from "./users/users.routes";
+import workoutRoutes from "./workouts/workout.routes";
+import totalWorkoutRoutes from "./totalWorkout/total-workout.routes";
+import badgeRoutes from "./badge/badge.routes";
+import notificationRoutes from "./notifications/notification.routes";
 import { authMiddleware } from "../middlewares/authentication.middleware";
 
 const router = Router();

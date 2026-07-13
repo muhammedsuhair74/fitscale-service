@@ -4,7 +4,7 @@ import {
   RABBITMQ_QUEUE_NAMES,
   WorkoutEventPayload,
 } from "../../lib/constants";
-import { syncTotalWorkoutCountService } from "../../services/total-workout.service";
+import { syncTotalWorkoutCountService } from "../../routes/totalWorkout/total-workout.service";
 
 export function startTotalWorkoutsConsumer() {
   const channel = getChannel();

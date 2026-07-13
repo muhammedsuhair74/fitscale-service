@@ -26,7 +26,17 @@ export const RABBITMQ_QUEUE_NAMES = {
   BADGE_EVALUATION: "badge-evaluation",
 };
 
-export type WorkoutEventType = "created" | "updated" | "deleted";
+export enum WorkoutEventType {
+  CREATED = "created",
+  UPDATED = "updated",
+  DELETED = "deleted",
+}
+
+export enum WorkoutOutBoxStatusTypes {
+  PENDING = "pending",
+  INPROGRESS = "inprogress",
+  DONE = "done",
+}
 
 export interface WorkoutEventPayload {
   event: WorkoutEventType;

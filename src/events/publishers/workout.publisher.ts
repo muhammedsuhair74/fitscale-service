@@ -1,10 +1,11 @@
-import { WorkoutType } from "@prisma/client";
+import { WorkoutType, OutBoxBody } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
 import {
   RABBITMQ_QUEUE_NAMES,
-  WorkoutEventPayload,
   WorkoutEventType,
+  WorkoutEventPayload,
 } from "../../lib/constants";
+import { createOutBoxService } from "../../outBox/outBox.service";
 
 function enqueueWorkoutSync(payload: WorkoutEventPayload) {
   const channel = getChannel();
@@ -20,12 +21,21 @@ export function publishWorkoutCreated(
   userId: string,
   workoutType: WorkoutType,
 ) {
-  enqueueWorkoutSync({
-    event: "created",
-    workoutId,
-    userId,
-    workoutType,
-  });
+  const outboxBody: OutBoxBody = {
+    event: WorkoutEventType.CREATED,
+    payload: {
+      workoutId,
+      userId,
+      workoutType,
+    },
+  };
+  createOutBoxService(outboxBody);
+  // enqueueWorkoutSync({
+  //   event: WorkoutEventType.CREATED,
+  //   workoutId,
+  //   userId,
+  //   workoutType,
+  // });
 }
 
 export function publishWorkoutUpdated(
@@ -35,7 +45,7 @@ export function publishWorkoutUpdated(
   previousWorkoutType: WorkoutType,
 ) {
   enqueueWorkoutSync({
-    event: "updated",
+    event: WorkoutEventType.UPDATED,
     workoutId,
     userId,
     workoutType,
@@ -49,7 +59,7 @@ export function publishWorkoutDeleted(
   workoutType: WorkoutType,
 ) {
   enqueueWorkoutSync({
-    event: "deleted",
+    event: WorkoutEventType.DELETED,
     workoutId,
     userId,
     workoutType,
