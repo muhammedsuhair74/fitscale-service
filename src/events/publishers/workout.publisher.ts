@@ -1,4 +1,4 @@
-import { WorkoutType, OutBoxBody } from "@prisma/client";
+import { WorkoutType } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
 import {
   RABBITMQ_QUEUE_NAMES,
@@ -21,15 +21,15 @@ export function publishWorkoutCreated(
   userId: string,
   workoutType: WorkoutType,
 ) {
-  const outboxBody: OutBoxBody = {
-    event: WorkoutEventType.CREATED,
-    payload: {
-      workoutId,
-      userId,
-      workoutType,
-    },
-  };
-  createOutBoxService(outboxBody);
+  // const outboxBody: Outbox = {
+  //   event: WorkoutEventType.CREATED,
+  //   payload: {
+  //     workoutId,
+  //     userId,
+  //     workoutType,
+  //   },
+  // };
+  // createOutBoxService(outboxBody);
   // enqueueWorkoutSync({
   //   event: WorkoutEventType.CREATED,
   //   workoutId,
