@@ -50,8 +50,11 @@ export const createWorkoutService = async (
     count,
   });
 
-  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
-  publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
+  const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
+
+  await invalidateWorkoutCaches(cacheKeysToInvalidate);
+
+  // publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;
 };
 

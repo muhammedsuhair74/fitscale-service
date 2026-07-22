@@ -24,7 +24,7 @@ enum WorkoutType {
  PLANK
 }
 
-enum OutBoxStatusTypes {
+enum OutBoxStatus {
   PENDING
   INPROGRESS
   DONE
@@ -56,6 +56,12 @@ enum NotificationType {
   LEADERBOARD
 }
 
+enum EventTypes {
+  WORKOUT_CREATED
+  WORKOUT_UPDATED
+  WORKOUT_DELETED
+}
+
 model User {
  id String @id @default(uuid())
  email String @unique
@@ -84,23 +90,29 @@ model Workout {
  @@index([userId, workoutType, createdAt])
 }
 
-model WorkoutOutbox {
+model outbox {
   id String @id @default(uuid())
   eventId String @unique
-  eventType String
+  eventType EventTypes
   aggregateId String
   aggregateType String
+  aggregateVersion Int
   correlationId String?
+  publishedBy String?
   causationId String?
+  nextRetryAt DateTime?
+  metadata Json?
   payload Json
-  status OutBoxStatusTypes
-  createdAt DateTime @default(now())
-  publishedAt DateTime?
+  status OutBoxStatus
   retryCount Int @default(0)
+  createdAt DateTime @default(now())
   lastError String?
+  publishedAt DateTime?
+
+  @@index([status])
 }
 
-model TotalWorkoutIdempotency {
+model ProcessedEvent {
   id String @id @default(uuid())
   eventId String @unique
   processedAt DateTime @default(now())

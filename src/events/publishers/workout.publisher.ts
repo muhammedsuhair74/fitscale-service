@@ -5,7 +5,6 @@ import {
   WorkoutEventType,
   WorkoutEventPayload,
 } from "../../lib/constants";
-import { createOutBoxService } from "../../outBox/outBox.service";
 
 function enqueueWorkoutSync(payload: WorkoutEventPayload) {
   const channel = getChannel();
