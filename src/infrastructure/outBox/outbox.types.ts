@@ -1,3 +1,5 @@
+import { WorkoutEventType } from "../../lib/constants";
+
 export const EVENT_TYPES = {
   WORKOUT_CREATED: "WORKOUT_CREATED",
   WORKOUT_UPDATED: "WORKOUT_UPDATED",
@@ -16,4 +18,9 @@ export interface DomainEvent<T> {
   aggregateVersion: number; // Version of the aggregate that the event belongs to, which is used in idempotency check
   occurredAt: Date; // Timestamp of the event
   payload: T; // Payload of the event
+}
+
+export interface WorkoutEventPayload<T> {
+  eventType: WorkoutEventType;
+  payload: T;
 }

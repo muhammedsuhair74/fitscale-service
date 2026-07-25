@@ -1,9 +1,5 @@
 import { getChannel } from "../../lib/rabbitmq";
-import {
-  RABBITMQ_EXCHANGE,
-  RABBITMQ_QUEUE_NAMES,
-  WorkoutEventPayload,
-} from "../../lib/constants";
+import { RABBITMQ_EXCHANGE, RABBITMQ_QUEUE_NAMES } from "../../lib/constants";
 import { syncTotalWorkoutCountService } from "../../routes/totalWorkout/total-workout.service";
 
 export function startTotalWorkoutsConsumer() {
@@ -13,9 +9,7 @@ export function startTotalWorkoutsConsumer() {
     if (!message) return;
 
     try {
-      const payload = JSON.parse(
-        message.content.toString(),
-      ) as WorkoutEventPayload;
+      const payload = JSON.parse(message.content.toString());
 
       await syncTotalWorkoutCountService(payload.userId, payload.workoutType);
 

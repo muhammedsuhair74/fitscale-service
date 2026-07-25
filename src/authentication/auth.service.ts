@@ -2,11 +2,7 @@ import bcrypt from "bcrypt";
 import { JwtPayload } from "jsonwebtoken";
 import { User } from "@prisma/client";
 import { userRepository } from "../routes/users/user.repository";
-import {
-  createUserService,
-  getUserByEmailOrThrow,
-  getUserByIdService,
-} from "./users.service";
+
 import {
   ACCESS_TOKEN_EXPIRY_SECONDS,
   decodeRefreshToken,
@@ -15,6 +11,11 @@ import {
   REFRESH_TOKEN_EXPIRY_SECONDS,
   verifyRefreshToken,
 } from "../utils/jwt";
+import {
+  createUserService,
+  getUserByEmailOrThrow,
+  getUserByIdService,
+} from "../routes/users/users.service";
 
 export const verifyRefreshTokenService = (refreshToken: string): JwtPayload => {
   if (!refreshToken) {

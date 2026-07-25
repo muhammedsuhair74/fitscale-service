@@ -3,12 +3,12 @@ import { workoutRepository } from "./workout.repository";
 import { redis } from "../../lib/redis";
 import { cacheKeys } from "../../lib/constants";
 import { getCache, setCache } from "../../lib/cache";
-import { invalidateWorkoutCaches } from "../../redis/invalidate";
 import {
   publishWorkoutCreated,
   publishWorkoutDeleted,
   publishWorkoutUpdated,
 } from "../../events/publishers/workout.publisher";
+import { invalidateWorkoutCaches } from "../../infrastructure/redis/invalidate";
 
 export const invalidateWorkoutCachesKeys = (userId: string) => [
   cacheKeys.allWorkouts,

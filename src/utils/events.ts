@@ -1,5 +1,5 @@
 import { uuidv4 } from "zod";
-import { DomainEvent, EventType } from "../outBox/outbox.types";
+import { DomainEvent } from "../infrastructure/outBox/outbox.types";
 
 export enum EventTypes {
   WORKOUT_CREATED = "WORKOUT_CREATED",

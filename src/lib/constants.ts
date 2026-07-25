@@ -38,10 +38,7 @@ export enum WorkoutOutBoxStatusTypes {
   DONE = "done",
 }
 
-export interface WorkoutEventPayload {
+export interface eventPayload<T> {
   event: WorkoutEventType;
-  workoutId: string;
-  userId: string;
-  workoutType: WorkoutType;
-  previousWorkoutType?: WorkoutType;
+  payload: T;
 }

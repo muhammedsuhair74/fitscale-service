@@ -1,8 +1,8 @@
 import { BadgeType, WorkoutType } from "@prisma/client";
 import { badgeRepository } from "./badge.repository";
 import { workoutRepository } from "../workouts/workout.repository";
-import { WorkoutEventPayload } from "../../lib/constants";
 import { totalWorkoutRepository } from "../totalWorkout/total-workout.repository";
+import { WorkoutEventPayload } from "../../events/publishers/workout.publisher";
 
 const BADGE_THRESHOLDS: Record<
   WorkoutType,
@@ -124,19 +124,21 @@ export async function evaluateAllBadges(userId: string) {
   }
 }
 
-export async function handleBadgeWorkoutEvent(payload: WorkoutEventPayload) {
-  const typesToEvaluate = new Set<WorkoutType>([payload.workoutType]);
+// export async function handleBadgeWorkoutEvent(
+//   data: WorkoutEventPayload<Un>,
+// ) {
+//   const typesToEvaluate = new Set<WorkoutType>([data.payload.workoutType]);
 
-  if (
-    payload.event === "updated" &&
-    payload.previousWorkoutType &&
-    payload.previousWorkoutType !== payload.workoutType
-  ) {
-    typesToEvaluate.add(payload.previousWorkoutType);
-  }
+//   if (
+//     data.event === "updated" &&
+//     data.payload.previousWorkoutType &&
+//     data.payload.previousWorkoutType !== data.payload.workoutType
+//   ) {
+//     typesToEvaluate.add(data.payload.previousWorkoutType);
+//   }
 
-  for (const workoutType of typesToEvaluate) {
-    await evaluateBadgesForWorkoutType(payload.userId, workoutType);
-  }
-  return true;
-}
+//   for (const workoutType of typesToEvaluate) {
+//     await evaluateBadgesForWorkoutType(data.payload.userId, workoutType);
+//   }
+//   return true;
+// }

@@ -26,8 +26,9 @@ enum WorkoutType {
 
 enum OutBoxStatus {
   PENDING
-  INPROGRESS
-  DONE
+  PROCESSING
+  PUBLISHED
+  FAILED
 }
 
 enum BadgeType {
@@ -90,7 +91,7 @@ model Workout {
  @@index([userId, workoutType, createdAt])
 }
 
-model outbox {
+model Outbox {
   id String @id @default(uuid())
   eventId String @unique
   eventType EventTypes
@@ -98,7 +99,6 @@ model outbox {
   aggregateType String
   aggregateVersion Int
   correlationId String?
-  publishedBy String?
   causationId String?
   nextRetryAt DateTime?
   metadata Json?
@@ -108,8 +108,13 @@ model outbox {
   createdAt DateTime @default(now())
   lastError String?
   publishedAt DateTime?
+  producer String
+  routingKey  String
+  headers Json?
+  sourceService String
 
   @@index([status])
+  @@map("outbox")
 }
 
 model ProcessedEvent {

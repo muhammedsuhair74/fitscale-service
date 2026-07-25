@@ -1,7 +1,7 @@
 import { Prisma, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
-import { saveEventRepository } from "../../outBox/outBox.service";
-import { DomainEvent } from "../../outBox/outbox.types";
+import { saveEventRepository } from "../../routes/outbox/outBox.service";
+import { DomainEvent } from "../../infrastructure/outBox/outbox.types";
 import { EventTypes, generateEventPayload } from "../../utils/events";
 import { uuidv4 } from "zod";
 
