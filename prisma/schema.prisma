@@ -8,13 +8,17 @@ generator client {
 }
 
 datasource db {
- provider = "postgresql"
+  provider = "postgresql"
 }
 
 enum UserRoles {
- ADMIN
- TRAINER
- USER
+  ADMIN
+  TRAINER
+  USER
+}
+
+enum EventSourceTypes {
+  WORKOUT_CREATED
 }
 
 enum WorkoutType {

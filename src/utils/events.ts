@@ -1,4 +1,4 @@
-import { uuidv4 } from "zod";
+import { randomUUID } from "node:crypto";
 import { DomainEvent } from "../infrastructure/outBox/outbox.types";
 
 export enum EventTypes {
@@ -13,18 +13,20 @@ export const generateEventPayload = <T>({
   aggregateVersion,
   payload,
   eventType,
+  headers,
 }: Omit<
   DomainEvent<T>,
   "eventId" | "correlationId" | "occurredAt"
 >): DomainEvent<T> => {
   return {
-    eventId: uuidv4().toString(),
-    correlationId: uuidv4().toString(),
+    eventId: randomUUID(),
+    correlationId: randomUUID(),
     occurredAt: new Date(),
     eventType,
     aggregateId,
     aggregateType,
     aggregateVersion,
+    headers,
     payload,
   };
 };

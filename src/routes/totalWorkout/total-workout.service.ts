@@ -4,6 +4,27 @@ import { workoutRepository } from "../workouts/workout.repository";
 import { cacheKeys } from "../../lib/constants";
 import { deleteCache, getCache, setCache } from "../../lib/cache";
 
+export const createTotalWorkoutService = async (
+  userId: string,
+  workoutType: WorkoutType,
+  totalCount: number,
+): Promise<TotalWorkouts> => {
+  try {
+    const totalWorkout = await totalWorkoutRepository.create(
+      userId,
+      workoutType,
+      totalCount,
+    );
+    await deleteCache(cacheKeys.allTotalWorkouts);
+    await deleteCache(cacheKeys.totalWorkoutsByUserId(userId));
+    return totalWorkout;
+  } catch {
+    throw new Error(
+      "Total workout already exists for this user and workout type",
+    );
+  }
+};
+
 export const getTotalWorkoutsByUserService = async (
   userId: string,
 ): Promise<TotalWorkouts[]> => {
@@ -55,27 +76,6 @@ export const getAllTotalWorkoutsService = async (): Promise<
   const data = await totalWorkoutRepository.findMany();
   await setCache(cacheKeys.allTotalWorkouts, data);
   return data;
-};
-
-export const createTotalWorkoutService = async (
-  userId: string,
-  workoutType: WorkoutType,
-  totalCount: number,
-): Promise<TotalWorkouts> => {
-  try {
-    const totalWorkout = await totalWorkoutRepository.create(
-      userId,
-      workoutType,
-      totalCount,
-    );
-    await deleteCache(cacheKeys.allTotalWorkouts);
-    await deleteCache(cacheKeys.totalWorkoutsByUserId(userId));
-    return totalWorkout;
-  } catch {
-    throw new Error(
-      "Total workout already exists for this user and workout type",
-    );
-  }
 };
 
 export const updateTotalWorkoutService = async (

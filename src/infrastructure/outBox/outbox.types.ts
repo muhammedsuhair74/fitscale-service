@@ -3,7 +3,8 @@ import { WorkoutEventType } from "../../lib/constants";
 export const EVENT_TYPES = {
   WORKOUT_CREATED: "WORKOUT_CREATED",
   WORKOUT_UPDATED: "WORKOUT_UPDATED",
-  BADGE_AWARDED: "BADGE_AWARDED",
+  WORKOUT_DELETED: "WORKOUT_DELETED",
+  // BADGE_AWARDED: "BADGE_AWARDED",
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -17,6 +18,7 @@ export interface DomainEvent<T> {
   aggregateType: string; // Type of the aggregate that the event belongs to, if aggregateId is qwqeqw , what of something is qwqeqw ? aggregateType will give the answer to that
   aggregateVersion: number; // Version of the aggregate that the event belongs to, which is used in idempotency check
   occurredAt: Date; // Timestamp of the event
+  headers?: Record<string, unknown>; // Request / transport headers for the event
   payload: T; // Payload of the event
 }
 

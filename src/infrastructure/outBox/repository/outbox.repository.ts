@@ -1,13 +1,12 @@
 import {
+  EventSourceTypes,
   OutBoxStatus,
   Prisma,
   PrismaClient,
-  outbox as OutBox,
 } from "@prisma/client";
-import { DefaultArgs } from "@prisma/client/runtime/client";
 import { DomainEvent } from "../outbox.types";
-// import { OutBox } from "../../domain/outBox/outbox.entity";
-// import { DomainEvent } from "../../domain/event/domain.event";
+
+type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
 interface IOutboxRepository {
   save(
@@ -15,7 +14,7 @@ interface IOutboxRepository {
     event: DomainEvent<unknown>,
   ): Promise<void>;
 
-  findPending(batchSize: number): Promise<OutBox[]>;
+  findPending(batchSize: number): Promise<OutboxRow[]>;
 
   markPublished(id: string): Promise<void>;
 
@@ -31,47 +30,55 @@ export class OutboxRepository implements IOutboxRepository {
     tx: Prisma.TransactionClient,
     event: DomainEvent<unknown>,
   ): Promise<void> {
-    const outboxData = {
-      eventId: event.eventId,
-      eventType: event.eventType,
-      aggregateId: event.aggregateId,
-      aggregateType: event.aggregateType,
-      aggregateVersion: event.aggregateVersion,
-      correlationId: event.correlationId,
-      causationId: event.causationId,
-      payload: event.payload as Prisma.InputJsonValue,
-      status: OutBoxStatus.PENDING,
-    };
-
     const created = await tx.outbox.create({
-      data: outboxData,
+      data: {
+        eventId: event.eventId,
+        eventType: event.eventType,
+        aggregateId: event.aggregateId,
+        aggregateType: event.aggregateType,
+        aggregateVersion: event.aggregateVersion,
+        correlationId: event.correlationId,
+        causationId: event.causationId,
+        headers: event.headers as Prisma.InputJsonValue | undefined,
+        payload: event.payload as Prisma.InputJsonValue,
+        status: OutBoxStatus.PENDING,
+        producer: EventSourceTypes.WORKOUT_CREATED,
+        routingKey: event.eventType,
+        sourceService: EventSourceTypes.WORKOUT_CREATED,
+      },
     });
-    return;
-    // return created;
+
+    if (!created) {
+      throw new Error("Failed to save event to outbox");
+    }
   }
 
-  async findPending(batchSize: number): Promise<OutBox[]> {
-    const outboxes = await this.prisma.outbox.findMany({
+  async findPending(batchSize: number): Promise<OutboxRow[]> {
+    return this.prisma.outbox.findMany({
       where: {
         status: OutBoxStatus.PENDING,
       },
       take: batchSize,
     });
-
-    return outboxes;
   }
 
   async markPublished(id: string): Promise<void> {
     await this.prisma.outbox.update({
       where: { id },
-      data: { status: OutBoxStatus.DONE },
+      data: {
+        status: OutBoxStatus.PUBLISHED,
+        publishedAt: new Date(),
+      },
     });
   }
 
   async markFailed(id: string, reason: string): Promise<void> {
     await this.prisma.outbox.update({
       where: { id },
-      data: { status: OutBoxStatus.INPROGRESS, error: reason },
+      data: {
+        status: OutBoxStatus.FAILED,
+        lastError: reason,
+      },
     });
   }
 
@@ -82,34 +89,12 @@ export class OutboxRepository implements IOutboxRepository {
   ): Promise<void> {
     await this.prisma.outbox.update({
       where: { id },
-      data: { status: OutBoxStatus.INPROGRESS, error: reason },
+      data: {
+        status: OutBoxStatus.PROCESSING,
+        nextRetryAt,
+        lastError: reason,
+        retryCount: { increment: 1 },
+      },
     });
   }
 }
-
-// export const saveEventRepository = async (
-//   tx: Prisma.TransactionClient,
-//   event: DomainEvent<unknown>,
-// ) => {
-//   try {
-//     const outboxData = {
-//       eventId: event.eventId,
-//       eventType: event.eventType,
-//       aggregateId: event.aggregateId,
-//       aggregateType: event.aggregateType,
-//       aggregateVersion: event.aggregateVersion,
-//       correlationId: event.correlationId,
-//       causationId: event.causationId,
-//       payload: event.payload as Prisma.InputJsonValue,
-//       status: OutBoxStatus.PENDING,
-//     };
-
-//     const created = await tx.outbox.create({
-//       data: outboxData,
-//     });
-
-//     return created;
-//   } catch (error) {
-//     throw error;
-//   }
-// };

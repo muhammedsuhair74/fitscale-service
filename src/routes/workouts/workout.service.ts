@@ -15,6 +15,27 @@ export const invalidateWorkoutCachesKeys = (userId: string) => [
   cacheKeys.workoutsByUserId(userId),
 ];
 
+export const createWorkoutService = async (
+  userId: string,
+  workoutType: WorkoutType,
+  count: number,
+  headers?: Record<string, unknown>,
+): Promise<Workout> => {
+  const workout = await workoutRepository.create(
+    userId,
+    workoutType,
+    count,
+    headers,
+  );
+
+  const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
+
+  await invalidateWorkoutCaches(cacheKeysToInvalidate);
+
+  // publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
+  return workout;
+};
+
 export const getWorkoutsService = async (
   userId: string,
 ): Promise<Workout[]> => {
@@ -36,25 +57,6 @@ export const getWorkoutByIdService = async (
 ): Promise<Workout> => {
   const workout = await workoutRepository.findFirstByIdAndUserId(id, userId);
   if (!workout) throw new Error("Workout not found");
-  return workout;
-};
-
-export const createWorkoutService = async (
-  userId: string,
-  workoutType: WorkoutType,
-  count: number,
-): Promise<Workout> => {
-  const workout = await workoutRepository.create({
-    userId,
-    workoutType,
-    count,
-  });
-
-  const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
-
-  await invalidateWorkoutCaches(cacheKeysToInvalidate);
-
-  // publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;
 };
 
