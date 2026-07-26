@@ -5,7 +5,7 @@ import {
   RABBITMQ_QUEUE_NAMES,
   WorkoutEventType,
 } from "../../lib/constants";
-import { WorkoutEventPayload } from "../../infrastructure/outBox/outbox.types";
+import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
 
 function enqueueWorkoutSync(payload: eventPayload<unknown>) {
   const channel = getChannel();
@@ -19,7 +19,7 @@ function enqueueWorkoutSync(payload: eventPayload<unknown>) {
 export async function publishWorkoutCreated<T>({
   eventType,
   payload,
-}: WorkoutEventPayload<T>) {
+}: DomainEvent<T>) {
   console.log("publishWorkoutCreated", payload);
   console.log("eventType", eventType);
 }
@@ -56,4 +56,4 @@ export function publishWorkoutDeleted(
   });
 }
 
-export type { WorkoutEventPayload };
+export type { DomainEvent };

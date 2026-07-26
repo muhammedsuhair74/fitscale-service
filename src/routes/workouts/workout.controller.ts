@@ -19,12 +19,11 @@ export const createWorkoutController = async (
     let headers = req.headers;
     delete headers.cookie;
     delete headers.authorization;
-    const headersString = JSON.stringify(headers);
     const workout = await createWorkoutService(
       userId,
       workoutType,
       count,
-      JSON.parse(headersString),
+      headers,
     );
     res.status(201).json({
       workout,

@@ -1,8 +1,10 @@
 import { Prisma, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { saveEventRepository } from "../../routes/outbox/outBox.service";
-import { DomainEvent } from "../../infrastructure/outBox/outbox.types";
-import { EventTypes, generateEventPayload } from "../../utils/events";
+import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
+import { generateEventPayload } from "../../utils/events";
+import { EVENT_TYPES } from "../../infrastructure/events/contracts/event-type";
+import { AggregateType } from "../../infrastructure/events/contracts/aggregate-type";
 
 export type WorkoutCreatedEventPayload = {
   userId: string;
@@ -30,7 +32,7 @@ export const workoutRepository = {
     userId: string,
     workoutType: WorkoutType,
     count: number,
-    headers?: Record<string, unknown>,
+    headers?: Object,
   ) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       try {
@@ -47,12 +49,12 @@ export const workoutRepository = {
         const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
           generateEventPayload<WorkoutCreatedEventPayload>({
             aggregateId: workout.id,
-            aggregateType: "workout",
+            aggregateType: AggregateType.WORKOUT,
             causationId: workout.id,
             aggregateVersion: 1,
             payload,
             headers,
-            eventType: EventTypes.WORKOUT_CREATED,
+            eventType: EVENT_TYPES.WORKOUT_CREATED,
           });
 
         await saveEventRepository(tx, eventDetails);

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
-import { DomainEvent } from "../../infrastructure/outBox/outbox.types";
-import { OutboxRepository } from "../../infrastructure/outBox/repository/outbox.repository";
+import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
+import { OutboxRepository } from "../../infrastructure/events/outBox/repository/outbox.repository";
 import { prisma } from "../../lib/prisma";
 
 const outboxRepositoryInstance = new OutboxRepository(prisma);

@@ -2,7 +2,6 @@ import { BadgeType, WorkoutType } from "@prisma/client";
 import { badgeRepository } from "./badge.repository";
 import { workoutRepository } from "../workouts/workout.repository";
 import { totalWorkoutRepository } from "../totalWorkout/total-workout.repository";
-import { WorkoutEventPayload } from "../../events/publishers/workout.publisher";
 
 const BADGE_THRESHOLDS: Record<
   WorkoutType,

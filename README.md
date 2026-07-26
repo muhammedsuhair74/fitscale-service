@@ -4,18 +4,18 @@ REST API for Fitscale — user auth, user management, workout tracking, and badg
 
 ## Tech Stack
 
-| Layer | Technology |
-| ----- | ---------- |
-| Runtime | Node.js 20+ |
-| Framework | Express 5 |
-| Language | TypeScript |
-| Database | PostgreSQL 16 (Prisma ORM + `@prisma/adapter-pg`) |
-| Cache | Redis 7 (`redis` npm package) |
+| Layer         | Technology                                                |
+| ------------- | --------------------------------------------------------- |
+| Runtime       | Node.js 20+                                               |
+| Framework     | Express 5                                                 |
+| Language      | TypeScript                                                |
+| Database      | PostgreSQL 16 (Prisma ORM + `@prisma/adapter-pg`)         |
+| Cache         | Redis 7 (`redis` npm package)                             |
 | Message queue | RabbitMQ 3 (`amqplib`) — workout events for badge workers |
-| Auth | JWT in httpOnly cookies, bcrypt password hashing |
-| Validation | Zod |
-| Reverse proxy | Nginx (Docker only) |
-| Tooling | helmet, cors, cookie-parser, morgan, dotenv |
+| Auth          | JWT in httpOnly cookies, bcrypt password hashing          |
+| Validation    | Zod                                                       |
+| Reverse proxy | Nginx (Docker only)                                       |
+| Tooling       | helmet, cors, cookie-parser, morgan, dotenv               |
 
 ---
 
@@ -58,15 +58,15 @@ Generate secrets:
 openssl rand -hex 32
 ```
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `DATABASE_URL` | Yes | Postgres connection string |
-| `JWT_SECRET` | Yes | Signs access tokens (1h) |
-| `JWT_REFRESH_SECRET` | Yes | Signs refresh tokens (7d) |
-| `REDIS_URL` | Yes | Redis connection URL |
-| `PORT` | No | API port (default `5001`) |
-| `NODE_ENV` | No | `development` or `production` |
-| `CLIENT_URL` | No | Allowed CORS origin (default `http://localhost:3000`) |
+| Variable             | Required | Description                                           |
+| -------------------- | -------- | ----------------------------------------------------- |
+| `DATABASE_URL`       | Yes      | Postgres connection string                            |
+| `JWT_SECRET`         | Yes      | Signs access tokens (1h)                              |
+| `JWT_REFRESH_SECRET` | Yes      | Signs refresh tokens (7d)                             |
+| `REDIS_URL`          | Yes      | Redis connection URL                                  |
+| `PORT`               | No       | API port (default `5001`)                             |
+| `NODE_ENV`           | No       | `development` or `production`                         |
+| `CLIENT_URL`         | No       | Allowed CORS origin (default `http://localhost:3000`) |
 
 > **macOS:** avoid `PORT=5000` — AirPlay Receiver uses it and returns HTTP 403. Default is `5001`.
 
@@ -210,11 +210,11 @@ redis.on("error", (err) => {
 
 ### Local vs Docker URLs
 
-| Environment | `REDIS_URL` | Why |
-| ----------- | ----------- | --- |
-| Local dev (Redis on host) | `redis://localhost:6379` | Connect to Redis on your machine |
+| Environment                   | `REDIS_URL`              | Why                                  |
+| ----------------------------- | ------------------------ | ------------------------------------ |
+| Local dev (Redis on host)     | `redis://localhost:6379` | Connect to Redis on your machine     |
 | Local dev (Redis via Compose) | `redis://localhost:6379` | Port `6379` is published to the host |
-| API inside Docker Compose | `redis://redis:6379` | `redis` is the Docker service name |
+| API inside Docker Compose     | `redis://redis:6379`     | `redis` is the Docker service name   |
 
 > Inside Docker, **never** use `localhost` for Redis or Postgres — `localhost` refers to the container itself, not other services.
 
@@ -232,10 +232,10 @@ docker compose exec redis redis-cli ping
 
 ### Do I need to start Redis manually?
 
-| How you run the API | What to do |
-| ------------------- | ---------- |
-| `npm run dev` (local) | Start Redis first: `docker compose up redis -d` (or run Redis locally) |
-| `docker compose up` (full stack) | Redis starts automatically with the stack |
+| How you run the API              | What to do                                                             |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `npm run dev` (local)            | Start Redis first: `docker compose up redis -d` (or run Redis locally) |
+| `docker compose up` (full stack) | Redis starts automatically with the stack                              |
 
 Redis has a healthcheck in Compose. The `api` service waits for Redis to be healthy before starting.
 
@@ -247,13 +247,13 @@ Redis has a healthcheck in Compose. The `api` service waits for Redis to be heal
 
 RabbitMQ handles async workout events (create / update / delete). After a workout is saved, the API publishes an event so workers can sync totals, evaluate badges, and send notifications without blocking the HTTP response.
 
-| Piece | Path |
-| ----- | ---- |
-| Connection + setup | `src/lib/rabbitmq.ts` |
-| Constants (exchange, queues, payload type) | `src/lib/constants.ts` |
-| Publisher | `src/events/publishers/workout.publisher.ts` |
-| Consumers | `src/events/consumers/` (`total-workout`, `badge`, `notification`) |
-| Consumer startup | `src/lib/consumers.ts` |
+| Piece                                      | Path                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| Connection + setup                         | `src/lib/rabbitmq.ts`                                              |
+| Constants (exchange, queues, payload type) | `src/lib/constants.ts`                                             |
+| Publisher                                  | `src/events/publishers/workout.publisher.ts`                       |
+| Consumers                                  | `src/events/consumers/` (`total-workout`, `badge`, `notification`) |
+| Consumer startup                           | `src/lib/consumers.ts`                                             |
 
 On startup, `connectRabbit()` in `src/server.ts` asserts the exchange and queues; `startConsumers()` registers workers.
 
@@ -261,11 +261,11 @@ On startup, `connectRabbit()` in `src/server.ts` asserts the exchange and queues
 
 **Queues:**
 
-| Queue | Purpose |
-| ----- | ------- |
+| Queue                 | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
 | `total-workouts-sync` | Sync `TotalWorkouts` counts from workout events |
-| `badge-evaluation` | Award badges based on totals |
-| `notifications` | Push real-time notifications via Socket.IO |
+| `badge-evaluation`    | Award badges based on totals                    |
+| `notifications`       | Push real-time notifications via Socket.IO      |
 
 > **Important:** `total-workouts-sync` must **not** be bound to the fanout exchange if the sync consumer republishes to that exchange after syncing — otherwise messages loop forever. Only downstream queues (`badge-evaluation`, `notifications`) should be bound.
 
@@ -289,12 +289,12 @@ workout-created-exchange (fanout)
 
 #### Core concepts
 
-| Term | Role |
-| ---- | ---- |
+| Term         | Role                                                                               |
+| ------------ | ---------------------------------------------------------------------------------- |
 | **Exchange** | Router — receives messages and forwards them to queues based on type + routing key |
-| **Queue** | Buffer — stores messages until a consumer reads them |
-| **Binding** | Link between exchange and queue (`bindQueue`) |
-| **Consumer** | Worker that reads from a **queue** (never from an exchange directly) |
+| **Queue**    | Buffer — stores messages until a consumer reads them                               |
+| **Binding**  | Link between exchange and queue (`bindQueue`)                                      |
+| **Consumer** | Worker that reads from a **queue** (never from an exchange directly)               |
 
 #### Setup (run once at startup)
 
@@ -302,7 +302,9 @@ workout-created-exchange (fanout)
 const connection = await amqp.connect("amqp://guest:guest@localhost:5672");
 const channel = await connection.createChannel();
 
-await channel.assertExchange("workout-created-exchange", "fanout", { durable: true });
+await channel.assertExchange("workout-created-exchange", "fanout", {
+  durable: true,
+});
 await channel.assertQueue("total-workouts-sync", { durable: true });
 await channel.assertQueue("badge-evaluation", { durable: true });
 await channel.bindQueue("badge-evaluation", "workout-created-exchange", "");
@@ -310,12 +312,12 @@ await channel.bindQueue("badge-evaluation", "workout-created-exchange", "");
 
 Exchange types:
 
-| Type | Use case |
-| ---- | -------- |
-| `fanout` | Broadcast to all bound queues (Fitscale exchange) |
-| `direct` | Route by exact routing key |
-| `topic` | Route by pattern (`workout.*`) |
-| `headers` | Route by message headers |
+| Type      | Use case                                          |
+| --------- | ------------------------------------------------- |
+| `fanout`  | Broadcast to all bound queues (Fitscale exchange) |
+| `direct`  | Route by exact routing key                        |
+| `topic`   | Route by pattern (`workout.*`)                    |
+| `headers` | Route by message headers                          |
 
 #### Send events (produce)
 
@@ -336,7 +338,7 @@ Use when one specific worker should handle the message (e.g. sync totals first).
 ```typescript
 channel.publish(
   "workout-created-exchange",
-  "",  // fanout ignores routing key
+  "", // fanout ignores routing key
   Buffer.from(JSON.stringify(payload)),
   { persistent: true },
 );
@@ -344,10 +346,10 @@ channel.publish(
 
 Use when one event should fan out to multiple consumers (badge + notifications).
 
-| | `sendToQueue` | `publish` |
-| --- | ------------- | --------- |
-| Target | One queue | Exchange → many queues |
-| Routing | Direct | Via bindings + routing key |
+|                  | `sendToQueue`      | `publish`                                      |
+| ---------------- | ------------------ | ---------------------------------------------- |
+| Target           | One queue          | Exchange → many queues                         |
+| Routing          | Direct             | Via bindings + routing key                     |
 | Fitscale example | Step 1: sync queue | Step 2: after sync, notify badge/notifications |
 
 #### Consume events
@@ -377,24 +379,24 @@ channel.consume("badge-evaluation", handler, { noAck: false });
 
 **Acknowledgement methods**
 
-| Method | Meaning |
-| ------ | ------- |
-| `channel.ack(message)` | Processed OK — remove from queue |
-| `channel.nack(message, false, true)` | Failed — requeue for retry |
+| Method                                | Meaning                           |
+| ------------------------------------- | --------------------------------- |
+| `channel.ack(message)`                | Processed OK — remove from queue  |
+| `channel.nack(message, false, true)`  | Failed — requeue for retry        |
 | `channel.nack(message, false, false)` | Failed — discard (or dead-letter) |
-| `channel.reject(message, requeue)` | Nack for a single message |
+| `channel.reject(message, requeue)`    | Nack for a single message         |
 
 #### Rules of thumb
 
-| I want to… | Method |
-| ---------- | ------ |
-| Send to one worker | `sendToQueue(queue, buffer, opts)` |
+| I want to…                | Method                                        |
+| ------------------------- | --------------------------------------------- |
+| Send to one worker        | `sendToQueue(queue, buffer, opts)`            |
 | Broadcast to many workers | `publish(exchange, routingKey, buffer, opts)` |
-| Read messages | `consume(queue, callback)` |
-| Confirm success | `ack(message)` |
-| Retry on failure | `nack(message, false, true)` |
-| Link exchange → queue | `bindQueue(queue, exchange, routingKey)` |
-| Remove a bad binding | `unbindQueue(queue, exchange, routingKey)` |
+| Read messages             | `consume(queue, callback)`                    |
+| Confirm success           | `ack(message)`                                |
+| Retry on failure          | `nack(message, false, true)`                  |
+| Link exchange → queue     | `bindQueue(queue, exchange, routingKey)`      |
+| Remove a bad binding      | `unbindQueue(queue, exchange, routingKey)`    |
 
 Always **consume from a queue**, never from an exchange name:
 
@@ -422,20 +424,20 @@ Serialize with `Buffer.from(JSON.stringify(payload))` and parse with `JSON.parse
 
 ### Connection details
 
-| Setting | Value |
-| ------- | ----- |
-| AMQP URL (local dev) | `amqp://guest:guest@localhost:5672` |
-| AMQP port (host) | `5672` |
-| Management UI | [http://localhost:15672](http://localhost:15672) |
-| Default credentials | `guest` / `guest` |
+| Setting              | Value                                            |
+| -------------------- | ------------------------------------------------ |
+| AMQP URL (local dev) | `amqp://guest:guest@localhost:5672`              |
+| AMQP port (host)     | `5672`                                           |
+| Management UI        | [http://localhost:15672](http://localhost:15672) |
+| Default credentials  | `guest` / `guest`                                |
 
 > The connection URL is currently hardcoded in `src/lib/rabbitmq.ts`. When running the API locally with Docker-backed RabbitMQ, ensure Compose maps **`5672:5672`** (the default in `docker-compose.yml`).
 
 ### Local vs Docker URLs
 
-| Environment | How the API reaches RabbitMQ |
-| ----------- | ------------------------------ |
-| Local dev (`npm run dev`) | `localhost:5672` — Compose publishes port `5672` to the host |
+| Environment               | How the API reaches RabbitMQ                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local dev (`npm run dev`) | `localhost:5672` — Compose publishes port `5672` to the host                                                                                                  |
 | API inside Docker Compose | `localhost:5672` inside the container **will not work** — use the service name `rabbitmq` (requires a code/env change; local dev is the supported path today) |
 
 ### Verify RabbitMQ
@@ -454,9 +456,9 @@ open http://localhost:15672   # macOS
 
 ### Do I need to start RabbitMQ manually?
 
-| How you run the API | What to do |
-| ------------------- | ---------- |
-| `npm run dev` (local) | Start RabbitMQ first: `docker compose up rabbitmq -d` (or run RabbitMQ locally) |
+| How you run the API              | What to do                                                                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev` (local)            | Start RabbitMQ first: `docker compose up rabbitmq -d` (or run RabbitMQ locally)                                                                    |
 | `docker compose up` (full stack) | RabbitMQ starts with the stack, but the API still connects via `localhost:5672` today — prefer **local API + Docker dependencies** for development |
 
 **Recommended local dev command** (starts all backing services in one go):
@@ -474,14 +476,14 @@ Schema lives in `prisma/schema.prisma`. Migrations are in `prisma/migrations/`.
 
 ### Common commands
 
-| Command | When to use |
-| ------- | ----------- |
-| `npx prisma generate` | After schema changes — regenerates the typed client |
-| `npx prisma migrate dev --name <change>` | Dev: create + apply a migration |
-| `npx prisma migrate deploy` | Prod/Docker: apply pending migrations |
-| `npx prisma migrate status` | Check if DB matches migration history |
-| `npx prisma migrate reset` | **Drops all data** and re-applies migrations |
-| `npx prisma db push` | Quick prototype sync (no migration files) |
+| Command                                  | When to use                                         |
+| ---------------------------------------- | --------------------------------------------------- |
+| `npx prisma generate`                    | After schema changes — regenerates the typed client |
+| `npx prisma migrate dev --name <change>` | Dev: create + apply a migration                     |
+| `npx prisma migrate deploy`              | Prod/Docker: apply pending migrations               |
+| `npx prisma migrate status`              | Check if DB matches migration history               |
+| `npx prisma migrate reset`               | **Drops all data** and re-applies migrations        |
+| `npx prisma db push`                     | Quick prototype sync (no migration files)           |
 
 ### Typical workflow after a schema change
 
@@ -494,9 +496,9 @@ Schema lives in `prisma/schema.prisma`. Migrations are in `prisma/migrations/`.
 
 Your app uses `DATABASE_URL` → `localhost:5432/fitscale` for local dev. SQL commands must target **that same database**.
 
-| How you connect | When to use |
-| --------------- | ----------- |
-| `docker compose exec db psql ...` | **Recommended** — always hits this project's Compose `db` service |
+| How you connect                                                 | When to use                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `docker compose exec db psql ...`                               | **Recommended** — always hits this project's Compose `db` service  |
 | `psql "postgresql://postgres:postgres@localhost:5432/fitscale"` | Same DB as `.env`, only if Compose `db` owns port 5432 on the host |
 
 > **Common mistake:** `docker compose exec db psql` and `localhost:5432` are **different databases** if two Postgres containers are running and only one is published on 5432. Symptoms: `\dt` shows no tables, or `relation "User" does not exist` even after migrations. Fix: stop the extra Postgres container, use Compose `db` only, then run `npx prisma migrate dev`.
@@ -539,15 +541,15 @@ lsof -i :5432
 
 **Useful `psql` meta-commands** (start with `\`, not SQL):
 
-| Command | Description |
-| ------- | ----------- |
-| `\l` | List all databases |
-| `\c fitscale` | Connect to the `fitscale` database |
-| `\dt` | List tables in the current database |
-| `\d "TableName"` | Describe a table |
-| `\q` | Quit |
-| `\?` | Help for `psql` commands |
-| `\h SELECT` | Help for SQL syntax |
+| Command          | Description                         |
+| ---------------- | ----------------------------------- |
+| `\l`             | List all databases                  |
+| `\c fitscale`    | Connect to the `fitscale` database  |
+| `\dt`            | List tables in the current database |
+| `\d "TableName"` | Describe a table                    |
+| `\q`             | Quit                                |
+| `\?`             | Help for `psql` commands            |
+| `\h SELECT`      | Help for SQL syntax                 |
 
 > Prisma table names are often capitalized — use double quotes exactly as in `schema.prisma` (e.g. `"User"`, `"Workout"`).
 
@@ -617,12 +619,12 @@ SELECT id, email, role FROM \"User\" WHERE email = 'user@example.com';
 
 ## Running the Project
 
-| Command | Description |
-| ------- | ----------- |
-| `npm run dev` | Dev server with hot reload (`ts-node-dev`) |
-| `npm run build` | Compile TypeScript → `dist/` |
-| `npm start` | Run production build |
-| `npm run typecheck` | Type-check without emitting files |
+| Command             | Description                                |
+| ------------------- | ------------------------------------------ |
+| `npm run dev`       | Dev server with hot reload (`ts-node-dev`) |
+| `npm run build`     | Compile TypeScript → `dist/`               |
+| `npm start`         | Run production build                       |
+| `npm run typecheck` | Type-check without emitting files          |
 
 ### Production (without Docker)
 
@@ -654,13 +656,13 @@ The stack runs six services:
                          └───────────┘
 ```
 
-| Service | Image | Host port | Purpose |
-| ------- | ----- | --------- | ------- |
-| `db` | `postgres:16-alpine` | 5432 | PostgreSQL database |
-| `redis` | `redis:7-alpine` | 6379 | Redis cache |
+| Service    | Image                   | Host port   | Purpose                       |
+| ---------- | ----------------------- | ----------- | ----------------------------- |
+| `db`       | `postgres:16-alpine`    | 5432        | PostgreSQL database           |
+| `redis`    | `redis:7-alpine`        | 6379        | Redis cache                   |
 | `rabbitmq` | `rabbitmq:3-management` | 5672, 15672 | Message queue + management UI |
-| `api` | Built from `Dockerfile` | 5001 | Express API |
-| `nginx` | `nginx:alpine` | 80 | Reverse proxy → API |
+| `api`      | Built from `Dockerfile` | 5001        | Express API                   |
+| `nginx`    | `nginx:alpine`          | 80          | Reverse proxy → API           |
 
 ### 1. Configure `.env`
 
@@ -709,19 +711,19 @@ curl http://localhost/health
 
 ### Common Docker commands
 
-| Command | Description |
-| ------- | ----------- |
-| `docker compose up --build` | Build images and start all services |
-| `docker compose up db redis rabbitmq -d` | Start only dependencies (for local `npm run dev`) |
-| `docker compose up redis -d` | Start only Redis |
-| `docker compose up rabbitmq -d` | Start only RabbitMQ |
-| `docker compose logs -f api` | Tail API logs |
-| `docker compose ps` | List running services |
-| `docker compose down` | Stop and remove containers |
-| `docker compose down -v` | Stop and **delete database volume** (fresh DB) |
-| `docker compose exec api sh` | Shell into the API container |
-| `docker compose exec db psql -U postgres -d fitscale` | Open PostgreSQL shell |
-| `docker compose exec redis redis-cli ping` | Test Redis |
+| Command                                               | Description                                       |
+| ----------------------------------------------------- | ------------------------------------------------- |
+| `docker compose up --build`                           | Build images and start all services               |
+| `docker compose up db redis rabbitmq -d`              | Start only dependencies (for local `npm run dev`) |
+| `docker compose up redis -d`                          | Start only Redis                                  |
+| `docker compose up rabbitmq -d`                       | Start only RabbitMQ                               |
+| `docker compose logs -f api`                          | Tail API logs                                     |
+| `docker compose ps`                                   | List running services                             |
+| `docker compose down`                                 | Stop and remove containers                        |
+| `docker compose down -v`                              | Stop and **delete database volume** (fresh DB)    |
+| `docker compose exec api sh`                          | Shell into the API container                      |
+| `docker compose exec db psql -U postgres -d fitscale` | Open PostgreSQL shell                             |
+| `docker compose exec redis redis-cli ping`            | Test Redis                                        |
 
 ### Cold start (from scratch)
 
@@ -843,23 +845,23 @@ Base URL: `http://localhost:5001` (or `http://localhost` via nginx)
 
 Auth uses **httpOnly cookies** — tokens are not returned in the JSON body.
 
-| Method | Endpoint | Body | Description |
-| ------ | -------- | ---- | ----------- |
-| `POST` | `/api/auth/register` | `{ email, password }` | Register (password min 8 chars) |
-| `POST` | `/api/auth/login` | `{ email, password }` | Login — sets `accessToken` + `refreshToken` cookies |
-| `POST` | `/api/auth/refresh-token` | — | Refresh tokens — requires `refreshToken` cookie |
-| `POST` | `/api/auth/logout` | — | Logout — requires `refreshToken` cookie, clears cookies |
+| Method | Endpoint                  | Body                  | Description                                             |
+| ------ | ------------------------- | --------------------- | ------------------------------------------------------- |
+| `POST` | `/api/auth/register`      | `{ email, password }` | Register (password min 8 chars)                         |
+| `POST` | `/api/auth/login`         | `{ email, password }` | Login — sets `accessToken` + `refreshToken` cookies     |
+| `POST` | `/api/auth/refresh-token` | —                     | Refresh tokens — requires `refreshToken` cookie         |
+| `POST` | `/api/auth/logout`        | —                     | Logout — requires `refreshToken` cookie, clears cookies |
 
 ### Users (protected — `accessToken` cookie)
 
-| Method | Endpoint | Access | Body |
-| ------ | -------- | ------ | ---- |
-| `POST` | `/api/users` | — | `{ email, password, role? }` |
-| `GET` | `/api/users` | Admin | — |
-| `GET` | `/api/users/:id` | Owner or admin | — |
-| `PUT` | `/api/users/:id` | Owner or admin | `{ email?, password?, role? }` |
-| `DELETE` | `/api/users/:id` | Owner or admin | — |
-| `DELETE` | `/api/users` | Admin | — |
+| Method   | Endpoint         | Access         | Body                           |
+| -------- | ---------------- | -------------- | ------------------------------ |
+| `POST`   | `/api/users`     | —              | `{ email, password, role? }`   |
+| `GET`    | `/api/users`     | Admin          | —                              |
+| `GET`    | `/api/users/:id` | Owner or admin | —                              |
+| `PUT`    | `/api/users/:id` | Owner or admin | `{ email?, password?, role? }` |
+| `DELETE` | `/api/users/:id` | Owner or admin | —                              |
+| `DELETE` | `/api/users`     | Admin          | —                              |
 
 User responses omit `passwordHash` and `token`.
 
@@ -869,9 +871,9 @@ Roles: `ADMIN`, `TRAINER`, `USER`
 
 Scoped to the authenticated user.
 
-| Method | Endpoint | Body |
-| ------ | -------- | ---- |
-| `GET` | `/api/workouts` | — |
+| Method | Endpoint        | Body                     |
+| ------ | --------------- | ------------------------ |
+| `GET`  | `/api/workouts` | —                        |
 | `POST` | `/api/workouts` | `{ workoutType, count }` |
 
 `workoutType`: `PUSHUP` | `SQUAT` | `SITUP` | `PLANK`  
@@ -879,9 +881,9 @@ Scoped to the authenticated user.
 
 ### Health
 
-| Method | Endpoint | Description |
-| ------ | -------- | ----------- |
-| `GET` | `/health` | `{ success, message }` |
+| Method | Endpoint  | Description            |
+| ------ | --------- | ---------------------- |
+| `GET`  | `/health` | `{ success, message }` |
 
 ### Postman
 
@@ -927,29 +929,29 @@ Dockerfile
 
 ## Troubleshooting
 
-| Problem | Fix |
-| ------- | --- |
-| `secretOrPrivateKey must have a value` | Set `JWT_SECRET` and `JWT_REFRESH_SECRET` in `.env`, restart |
-| `Redis Error: ECONNREFUSED` | Start Redis: `docker compose up redis -d`. Check `REDIS_URL=redis://localhost:6379` |
-| `Redis Connected` never appears | Ensure `import "./lib/redis"` is in `server.ts` and Redis is running |
-| `AggregateError` right after `Server running on 5001` | RabbitMQ is not running or wrong port. Run `docker compose up rabbitmq -d` and confirm port **5672** (`nc -zv localhost 5672`) |
-| `RabbitMQ Connected` never appears | Start RabbitMQ before `npm run dev`. Check `docker compose ps` |
-| Same workout processed hundreds of times | Stale binding: `total-workouts-sync` bound to exchange while consumer republishes after sync. Unbind with Management UI or purge queues; see [RabbitMQ](#rabbitmq) |
-| `NOT_FOUND - no queue 'workout-created-exchange'` | `consume()` must use a **queue** name, not the exchange name |
-| RabbitMQ port conflict on `5672` | Something else is using 5672: `lsof -i :5672`. Stop that process or change the host port in `docker-compose.yml` **and** update `src/lib/rabbitmq.ts` to match |
-| `docker run fitscale-backend-redis-1` fails | That is a container name, not an image. Use `docker compose up redis -d` instead |
-| `EADDRINUSE` on port 5001 | Another process (often a previous `npm run dev`) is using the port: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` or use a different `PORT` in `.env` |
+| Problem                                                     | Fix                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `secretOrPrivateKey must have a value`                      | Set `JWT_SECRET` and `JWT_REFRESH_SECRET` in `.env`, restart                                                                                                                                                                                   |
+| `Redis Error: ECONNREFUSED`                                 | Start Redis: `docker compose up redis -d`. Check `REDIS_URL=redis://localhost:6379`                                                                                                                                                            |
+| `Redis Connected` never appears                             | Ensure `import "./lib/redis"` is in `server.ts` and Redis is running                                                                                                                                                                           |
+| `AggregateError` right after `Server running on 5001`       | RabbitMQ is not running or wrong port. Run `docker compose up rabbitmq -d` and confirm port **5672** (`nc -zv localhost 5672`)                                                                                                                 |
+| `RabbitMQ Connected` never appears                          | Start RabbitMQ before `npm run dev`. Check `docker compose ps`                                                                                                                                                                                 |
+| Same workout processed hundreds of times                    | Stale binding: `total-workouts-sync` bound to exchange while consumer republishes after sync. Unbind with Management UI or purge queues; see [RabbitMQ](#rabbitmq)                                                                             |
+| `NOT_FOUND - no queue 'workout-created-exchange'`           | `consume()` must use a **queue** name, not the exchange name                                                                                                                                                                                   |
+| RabbitMQ port conflict on `5672`                            | Something else is using 5672: `lsof -i :5672`. Stop that process or change the host port in `docker-compose.yml` **and** update `src/lib/rabbitmq.ts` to match                                                                                 |
+| `docker run fitscale-backend-redis-1` fails                 | That is a container name, not an image. Use `docker compose up redis -d` instead                                                                                                                                                               |
+| `EADDRINUSE` on port 5001                                   | Another process (often a previous `npm run dev`) is using the port: `kill -9 $(lsof -tiTCP:5001 -sTCP:LISTEN)` or use a different `PORT` in `.env`                                                                                             |
 | `\dt` shows no relations / `relation "User" does not exist` | Wrong or empty database. Use one Postgres: stop extra containers on 5432 (`docker ps --filter publish=5432`), run `docker compose up db -d`, then `npx prisma migrate dev`. Connect with `docker compose exec db psql -U postgres -d fitscale` |
-| `docker compose exec db` has no tables but app has data | Two Postgres instances — app hits `localhost:5432`, `exec db` hits Compose internal DB. Stop the other container and use Compose `db` only |
-| Prisma can't connect locally | Confirm Postgres is running (`docker compose ps db`); verify `DATABASE_URL`; check port 5432 is not owned by a different container (`lsof -i :5432`) |
-| Prisma can't connect in Docker | Use service name `db`, not `localhost`, in Compose env |
-| Cookies not sent from browser | Set `CLIENT_URL` to your frontend origin; CORS does not allow `*` with credentials |
-| Cookies not stored on localhost | `Secure` cookies only apply when `NODE_ENV=production` |
-| `HTTP 403` on port 5000 (macOS) | Use `PORT=5001` or disable AirPlay Receiver |
-| Docker API fails on startup | Check logs: `docker compose logs api`. Often missing JWT secrets or migration failure |
-| nginx returns 502 | API not ready — `docker compose logs api`. Confirm `proxy_pass http://api:5001` in `nginx/nginx.conf` |
-| Schema out of sync in Docker | Run `docker compose exec api npx prisma migrate deploy` or rebuild with committed migrations |
-| TypeScript build fails in Docker | Run `npm run typecheck` locally first — Docker runs `npm run build` |
+| `docker compose exec db` has no tables but app has data     | Two Postgres instances — app hits `localhost:5432`, `exec db` hits Compose internal DB. Stop the other container and use Compose `db` only                                                                                                     |
+| Prisma can't connect locally                                | Confirm Postgres is running (`docker compose ps db`); verify `DATABASE_URL`; check port 5432 is not owned by a different container (`lsof -i :5432`)                                                                                           |
+| Prisma can't connect in Docker                              | Use service name `db`, not `localhost`, in Compose env                                                                                                                                                                                         |
+| Cookies not sent from browser                               | Set `CLIENT_URL` to your frontend origin; CORS does not allow `*` with credentials                                                                                                                                                             |
+| Cookies not stored on localhost                             | `Secure` cookies only apply when `NODE_ENV=production`                                                                                                                                                                                         |
+| `HTTP 403` on port 5000 (macOS)                             | Use `PORT=5001` or disable AirPlay Receiver                                                                                                                                                                                                    |
+| Docker API fails on startup                                 | Check logs: `docker compose logs api`. Often missing JWT secrets or migration failure                                                                                                                                                          |
+| nginx returns 502                                           | API not ready — `docker compose logs api`. Confirm `proxy_pass http://api:5001` in `nginx/nginx.conf`                                                                                                                                          |
+| Schema out of sync in Docker                                | Run `docker compose exec api npx prisma migrate deploy` or rebuild with committed migrations                                                                                                                                                   |
+| TypeScript build fails in Docker                            | Run `npm run typecheck` locally first — Docker runs `npm run build`                                                                                                                                                                            |
 
 ---
 
@@ -970,3 +972,31 @@ docker compose up --build
 # Reset Docker database
 docker compose down -v && docker compose up --build
 ```
+
+# All uncommitted changes
+
+git diff
+
+# Staged changes
+
+git diff --staged
+
+# Save changes as a patch
+
+git diff > changes.patch
+
+# Diff between branches
+
+git diff main...feature-branch
+
+# Save branch diff as patch
+
+git diff main...feature-branch > changes.patch
+
+# Apply a patch
+
+git apply changes.patch
+
+# Check patch before applying
+
+git apply --check changes.patch
