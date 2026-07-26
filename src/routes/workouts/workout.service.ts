@@ -3,17 +3,38 @@ import { workoutRepository } from "./workout.repository";
 import { redis } from "../../lib/redis";
 import { cacheKeys } from "../../lib/constants";
 import { getCache, setCache } from "../../lib/cache";
-import { invalidateWorkoutCaches } from "../../redis/invalidate";
 import {
   publishWorkoutCreated,
   publishWorkoutDeleted,
   publishWorkoutUpdated,
 } from "../../events/publishers/workout.publisher";
+import { invalidateWorkoutCaches } from "../../infrastructure/redis/invalidate";
 
 export const invalidateWorkoutCachesKeys = (userId: string) => [
   cacheKeys.allWorkouts,
   cacheKeys.workoutsByUserId(userId),
 ];
+
+export const createWorkoutService = async (
+  userId: string,
+  workoutType: WorkoutType,
+  count: number,
+  headers?: Record<string, unknown>,
+): Promise<Workout> => {
+  const workout = await workoutRepository.create(
+    userId,
+    workoutType,
+    count,
+    headers,
+  );
+
+  const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
+
+  await invalidateWorkoutCaches(cacheKeysToInvalidate);
+
+  // publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
+  return workout;
+};
 
 export const getWorkoutsService = async (
   userId: string,
@@ -36,22 +57,6 @@ export const getWorkoutByIdService = async (
 ): Promise<Workout> => {
   const workout = await workoutRepository.findFirstByIdAndUserId(id, userId);
   if (!workout) throw new Error("Workout not found");
-  return workout;
-};
-
-export const createWorkoutService = async (
-  userId: string,
-  workoutType: WorkoutType,
-  count: number,
-): Promise<Workout> => {
-  const workout = await workoutRepository.create({
-    userId,
-    workoutType,
-    count,
-  });
-
-  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
-  publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;
 };
 

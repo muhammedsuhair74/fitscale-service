@@ -1,13 +1,13 @@
-import { WorkoutType, OutBoxBody } from "@prisma/client";
+import { WorkoutType } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
 import {
+  eventPayload,
   RABBITMQ_QUEUE_NAMES,
   WorkoutEventType,
-  WorkoutEventPayload,
 } from "../../lib/constants";
-import { createOutBoxService } from "../../outBox/outBox.service";
+import { WorkoutEventPayload } from "../../infrastructure/outBox/outbox.types";
 
-function enqueueWorkoutSync(payload: WorkoutEventPayload) {
+function enqueueWorkoutSync(payload: eventPayload<unknown>) {
   const channel = getChannel();
   channel.sendToQueue(
     RABBITMQ_QUEUE_NAMES.TOTAL_WORKOUTS_SYNC,
@@ -16,26 +16,12 @@ function enqueueWorkoutSync(payload: WorkoutEventPayload) {
   );
 }
 
-export function publishWorkoutCreated(
-  workoutId: string,
-  userId: string,
-  workoutType: WorkoutType,
-) {
-  const outboxBody: OutBoxBody = {
-    event: WorkoutEventType.CREATED,
-    payload: {
-      workoutId,
-      userId,
-      workoutType,
-    },
-  };
-  createOutBoxService(outboxBody);
-  // enqueueWorkoutSync({
-  //   event: WorkoutEventType.CREATED,
-  //   workoutId,
-  //   userId,
-  //   workoutType,
-  // });
+export async function publishWorkoutCreated<T>({
+  eventType,
+  payload,
+}: WorkoutEventPayload<T>) {
+  console.log("publishWorkoutCreated", payload);
+  console.log("eventType", eventType);
 }
 
 export function publishWorkoutUpdated(
@@ -46,10 +32,12 @@ export function publishWorkoutUpdated(
 ) {
   enqueueWorkoutSync({
     event: WorkoutEventType.UPDATED,
-    workoutId,
-    userId,
-    workoutType,
-    previousWorkoutType,
+    payload: {
+      workoutId,
+      userId,
+      workoutType,
+      previousWorkoutType,
+    },
   });
 }
 
@@ -60,10 +48,12 @@ export function publishWorkoutDeleted(
 ) {
   enqueueWorkoutSync({
     event: WorkoutEventType.DELETED,
-    workoutId,
-    userId,
-    workoutType,
+    payload: {
+      workoutId,
+      userId,
+      workoutType,
+    },
   });
 }
 
-export type { WorkoutEventPayload, WorkoutEventType };
+export type { WorkoutEventPayload };

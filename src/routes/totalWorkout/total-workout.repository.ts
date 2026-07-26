@@ -2,6 +2,12 @@ import { WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 
 export const totalWorkoutRepository = {
+  create(userId: string, workoutType: WorkoutType, totalCount: number) {
+    return prisma.totalWorkouts.create({
+      data: { userId, workoutType, totalCount },
+    });
+  },
+
   findManyByUserId(userId: string) {
     return prisma.totalWorkouts.findMany({
       where: { userId },
@@ -21,12 +27,6 @@ export const totalWorkoutRepository = {
 
   findMany() {
     return prisma.totalWorkouts.findMany({ orderBy: { id: "desc" } });
-  },
-
-  create(userId: string, workoutType: WorkoutType, totalCount: number) {
-    return prisma.totalWorkouts.create({
-      data: { userId, workoutType, totalCount },
-    });
   },
 
   update(id: number, data: { workoutType?: WorkoutType; totalCount?: number }) {

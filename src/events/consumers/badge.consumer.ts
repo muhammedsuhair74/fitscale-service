@@ -1,6 +1,6 @@
 import { getChannel } from "../../lib/rabbitmq";
-import { RABBITMQ_QUEUE_NAMES, WorkoutEventPayload } from "../../lib/constants";
-import { handleBadgeWorkoutEvent } from "../../routes/badge/badge.service";
+import { RABBITMQ_QUEUE_NAMES } from "../../lib/constants";
+import { evaluateAllBadges } from "../../routes/badge/badge.service";
 
 export function startBadgeWorker() {
   const channel = getChannel();
@@ -9,11 +9,9 @@ export function startBadgeWorker() {
     if (!message) return;
 
     try {
-      const payload = JSON.parse(
-        message.content.toString(),
-      ) as WorkoutEventPayload;
+      const payload = JSON.parse(message.content.toString());
 
-      await handleBadgeWorkoutEvent(payload);
+      await evaluateAllBadges(payload.userId);
       channel.sendToQueue(
         RABBITMQ_QUEUE_NAMES.NOTIFICATIONS,
         Buffer.from(JSON.stringify(payload)),

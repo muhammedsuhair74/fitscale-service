@@ -13,6 +13,7 @@ import { connectRabbit } from "./lib/rabbitmq";
 import startConsumers from "./lib/consumers";
 import { errorMiddleware } from "./middlewares/error.middleware";
 import { initializeSocket } from "./socket";
+import { requestMiddleware } from "./middlewares/request.middleware";
 
 const app = express();
 app.use(helmet());
@@ -20,6 +21,7 @@ app.use(helmet());
 const clientOrigin = process.env.CLIENT_URL ?? "http://localhost:3000";
 
 app.use(performanceLogger);
+app.use(requestMiddleware);
 app.use(
   cors({
     origin: clientOrigin,

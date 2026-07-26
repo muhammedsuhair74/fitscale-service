@@ -1,5 +1,14 @@
-import { Workout, WorkoutType } from "@prisma/client";
+import { Prisma, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { saveEventRepository } from "../../routes/outbox/outBox.service";
+import { DomainEvent } from "../../infrastructure/outBox/outbox.types";
+import { EventTypes, generateEventPayload } from "../../utils/events";
+
+export type WorkoutCreatedEventPayload = {
+  userId: string;
+  workoutType: WorkoutType;
+  count: number;
+};
 
 export const workoutRepository = {
   findManyByUserId(userId: string) {
@@ -17,8 +26,42 @@ export const workoutRepository = {
     return prisma.workout.findMany();
   },
 
-  create(data: { userId: string; workoutType: WorkoutType; count: number }) {
-    return prisma.workout.create({ data });
+  create(
+    userId: string,
+    workoutType: WorkoutType,
+    count: number,
+    headers?: Record<string, unknown>,
+  ) {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      try {
+        const workout = await tx.workout.create({
+          data: { userId, workoutType, count },
+        });
+
+        const payload: WorkoutCreatedEventPayload = {
+          userId,
+          workoutType,
+          count,
+        };
+
+        const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
+          generateEventPayload<WorkoutCreatedEventPayload>({
+            aggregateId: workout.id,
+            aggregateType: "workout",
+            causationId: workout.id,
+            aggregateVersion: 1,
+            payload,
+            headers,
+            eventType: EventTypes.WORKOUT_CREATED,
+          });
+
+        await saveEventRepository(tx, eventDetails);
+
+        return workout;
+      } catch (error) {
+        throw error;
+      }
+    });
   },
 
   update(id: string, data: { workoutType: WorkoutType; count: number }) {

@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "OutBoxStatusTypes" AS ENUM ('PENDING', 'INPROGRESS', 'DONE');
+CREATE TYPE "OutBoxStatus" AS ENUM ('PENDING', 'INPROGRESS', 'DONE');
 
 -- CreateTable
 CREATE TABLE "WorkoutOutbox" (
@@ -11,7 +11,7 @@ CREATE TABLE "WorkoutOutbox" (
     "correlationId" TEXT,
     "causationId" TEXT,
     "payload" JSONB NOT NULL,
-    "status" "OutBoxStatusTypes" NOT NULL,
+    "status" "OutBoxStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publishedAt" TIMESTAMP(3),
     "retryCount" INTEGER NOT NULL DEFAULT 0,
