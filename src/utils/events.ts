@@ -1,11 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DomainEvent } from "../infrastructure/outBox/outbox.types";
-
-export enum EventTypes {
-  WORKOUT_CREATED = "WORKOUT_CREATED",
-  WORKOUT_UPDATED = "WORKOUT_UPDATED",
-  WORKOUT_DELETED = "WORKOUT_DELETED",
-}
+import { DomainEvent } from "../infrastructure/events/contracts/domain-event";
 
 export const generateEventPayload = <T>({
   aggregateId,
@@ -22,11 +16,12 @@ export const generateEventPayload = <T>({
     eventId: randomUUID(),
     correlationId: randomUUID(),
     occurredAt: new Date(),
+    correlationKey: randomUUID(),
     eventType,
     aggregateId,
     aggregateType,
     aggregateVersion,
     headers,
-    payload,
+    payload: JSON.parse(JSON.stringify(payload)),
   };
 };

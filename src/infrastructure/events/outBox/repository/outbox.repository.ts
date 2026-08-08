@@ -4,7 +4,7 @@ import {
   Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { DomainEvent } from "../outbox.types";
+import { DomainEvent } from "../../contracts/domain-event";
 
 type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
@@ -44,6 +44,7 @@ export class OutboxRepository implements IOutboxRepository {
         status: OutBoxStatus.PENDING,
         producer: EventSourceTypes.WORKOUT_CREATED,
         routingKey: event.eventType,
+        correlationKey: event.correlationKey,
         sourceService: EventSourceTypes.WORKOUT_CREATED,
       },
     });

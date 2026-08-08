@@ -19,7 +19,7 @@ export const createWorkoutService = async (
   userId: string,
   workoutType: WorkoutType,
   count: number,
-  headers?: Record<string, unknown>,
+  headers?: Object,
 ): Promise<Workout> => {
   const workout = await workoutRepository.create(
     userId,

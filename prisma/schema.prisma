@@ -19,6 +19,14 @@ enum UserRoles {
 
 enum EventSourceTypes {
   WORKOUT_CREATED
+  WORKOUT_UPDATED
+}
+
+enum AggregateType {
+  USER
+  WORKOUT
+  BADGE
+  NOTIFICATION
 }
 
 enum WorkoutType {
@@ -100,7 +108,7 @@ model Outbox {
   eventId String @unique
   eventType EventTypes
   aggregateId String
-  aggregateType String
+  aggregateType AggregateType
   aggregateVersion Int
   correlationId String?
   causationId String?
@@ -115,9 +123,13 @@ model Outbox {
   producer String
   routingKey  String
   headers Json?
-  sourceService String
+  sourceService EventSourceTypes
 
   @@index([status])
+  @@index([status, nextRetryAt])
+  @@index([eventId])
+  @@index([aggregateId, aggregateVersion])
+  
   @@map("outbox")
 }
 
