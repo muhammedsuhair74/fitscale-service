@@ -29,12 +29,7 @@ export const workoutRepository = {
     return prisma.workout.findMany();
   },
 
-  create(
-    userId: string,
-    workoutType: WorkoutType,
-    count: number,
-    headers?: Record<string, unknown>,
-  ) {
+  create(userId: string, workoutType: WorkoutType, count: number) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       try {
         const outboxRepositoryInstance = new OutboxRepository(
@@ -57,7 +52,6 @@ export const workoutRepository = {
             causationId: workout.id,
             aggregateVersion: 1,
             payload,
-            headers,
             eventType: EventType.WORKOUT_CREATED,
           });
 

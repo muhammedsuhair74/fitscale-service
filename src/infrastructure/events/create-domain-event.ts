@@ -12,8 +12,6 @@ interface CreateEventParams<T> {
   aggregateType: AggregateType;
   aggregateVersion: number;
   payload: T;
-  headers: Record<string, string>;
-  correlationKey?: string;
 }
 
 class EventFactory {
@@ -42,8 +40,6 @@ class EventFactory {
       aggregateVersion: params.aggregateVersion,
       occurredAt: this.clock.now(),
       payload: params.payload,
-      headers: params.headers,
-      correlationKey: params.correlationKey || this.idGenerator.generate(),
     };
 
     return event;

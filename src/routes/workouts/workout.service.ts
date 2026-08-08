@@ -19,14 +19,8 @@ export const createWorkoutService = async (
   userId: string,
   workoutType: WorkoutType,
   count: number,
-  headers?: Record<string, unknown>,
 ): Promise<Workout> => {
-  const workout = await workoutRepository.create(
-    userId,
-    workoutType,
-    count,
-    headers,
-  );
+  const workout = await workoutRepository.create(userId, workoutType, count);
 
   const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
 

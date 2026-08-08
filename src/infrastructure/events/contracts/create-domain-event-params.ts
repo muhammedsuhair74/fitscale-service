@@ -8,6 +8,4 @@ export interface CreateDomainEventParams<T> {
   readonly aggregateType: AggregateType;
   readonly aggregateVersion: number;
   readonly payload: T;
-  readonly headers?: Record<string, unknown>;
-  readonly correlationKey?: string;
 }

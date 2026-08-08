@@ -14,5 +14,4 @@ export interface DomainEvent<T> {
   readonly occurredAt: Date;
 
   readonly headers?: Record<string, unknown>; // Request / transport headers for the event
-  readonly correlationKey?: string; // To track event
 }
