@@ -16,15 +16,7 @@ export const createWorkoutController = async (
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
     const { workoutType, count } = req.body;
-    let headers = req.headers;
-    delete headers.cookie;
-    delete headers.authorization;
-    const workout = await createWorkoutService(
-      userId,
-      workoutType,
-      count,
-      headers,
-    );
+    const workout = await createWorkoutService(userId, workoutType, count);
     res.status(201).json({
       workout,
       success: true,

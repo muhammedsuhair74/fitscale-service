@@ -122,7 +122,6 @@ model Outbox {
   publishedAt DateTime?
   producer String
   routingKey  String
-  headers Json?
   sourceService EventSourceTypes
 
   @@index([status])

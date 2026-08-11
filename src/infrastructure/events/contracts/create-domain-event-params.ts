@@ -1,9 +1,9 @@
 import { AggregateType } from "./aggregate-type";
-import { EVENT_TYPES } from "./event-type";
+import { EventType } from "./event-type";
 
 export interface CreateDomainEventParams<T> {
   readonly causationId?: string;
-  readonly eventType: EVENT_TYPES;
+  readonly eventType: EventType;
   readonly aggregateId: string;
   readonly aggregateType: AggregateType;
   readonly aggregateVersion: number;

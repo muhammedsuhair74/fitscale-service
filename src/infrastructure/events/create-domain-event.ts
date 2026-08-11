@@ -1,20 +1,49 @@
-import crypto from "node:crypto";
-
-import { CreateDomainEventParams } from "./contracts/create-domain-event-params";
+import { AggregateType } from "./contracts/aggregate-type";
 import { DomainEvent } from "./contracts/domain-event";
+import { EventType } from "./contracts/event-type";
+import { IdGenerator } from "./eventCollaborators/IdGenerator";
+import { Clock } from "./eventCollaborators/Clock";
 
-export function createDomainEvent<T>(
-  params: CreateDomainEventParams<T>,
-): DomainEvent<T> {
-  return {
-    eventId: crypto.randomUUID(),
-    correlationId: crypto.randomUUID(),
-    causationId: params.causationId,
-    eventType: params.eventType,
-    aggregateId: params.aggregateId,
-    aggregateType: params.aggregateType,
-    aggregateVersion: params.aggregateVersion,
-    occurredAt: new Date(),
-    payload: params.payload,
-  };
+interface CreateEventParams<T> {
+  correlationId: string;
+  causationId?: string | null;
+  eventType: EventType;
+  aggregateId: string;
+  aggregateType: AggregateType;
+  aggregateVersion: number;
+  payload: T;
 }
+
+class EventFactory {
+  private readonly idGenerator: IdGenerator;
+  private readonly clock: Clock;
+
+  constructor({
+    idGenerator,
+    clock,
+  }: {
+    idGenerator: IdGenerator;
+    clock: Clock;
+  }) {
+    this.idGenerator = idGenerator;
+    this.clock = clock;
+  }
+
+  create<T>(params: CreateEventParams<T>): DomainEvent<T> {
+    const event: DomainEvent<T> = {
+      eventId: this.idGenerator.generate(),
+      correlationId: params.correlationId,
+      causationId: params.causationId ?? undefined,
+      eventType: params.eventType,
+      aggregateId: params.aggregateId,
+      aggregateType: params.aggregateType,
+      aggregateVersion: params.aggregateVersion,
+      occurredAt: this.clock.now(),
+      payload: params.payload,
+    };
+
+    return event;
+  }
+}
+
+export default EventFactory;

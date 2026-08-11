@@ -39,12 +39,10 @@ export class OutboxRepository implements IOutboxRepository {
         aggregateVersion: event.aggregateVersion,
         correlationId: event.correlationId,
         causationId: event.causationId,
-        headers: event.headers as Prisma.InputJsonValue | undefined,
         payload: event.payload as Prisma.InputJsonValue,
         status: OutBoxStatus.PENDING,
         producer: EventSourceTypes.WORKOUT_CREATED,
         routingKey: event.eventType,
-        correlationKey: event.correlationKey,
         sourceService: EventSourceTypes.WORKOUT_CREATED,
       },
     });

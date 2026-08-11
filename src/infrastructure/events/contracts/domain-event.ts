@@ -1,9 +1,9 @@
 import { AggregateType } from "./aggregate-type";
-import { EVENT_TYPES } from "./event-type";
+import { EventType } from "./event-type";
 
 export interface DomainEvent<T> {
   readonly causationId?: string;
-  readonly eventType: EVENT_TYPES;
+  readonly eventType: EventType;
   readonly aggregateId: string;
   readonly aggregateType: AggregateType;
   readonly aggregateVersion: number;
@@ -13,6 +13,5 @@ export interface DomainEvent<T> {
   readonly eventId: string;
   readonly occurredAt: Date;
 
-  readonly headers?: Object; // Request / transport headers for the event
-  readonly correlationKey?: string; // To track event
+  readonly headers?: Record<string, unknown>; // Request / transport headers for the event
 }

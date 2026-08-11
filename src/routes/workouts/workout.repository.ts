@@ -1,10 +1,11 @@
-import { Prisma, Workout, WorkoutType } from "@prisma/client";
+import { Prisma, PrismaClient, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { saveEventRepository } from "../../routes/outbox/outBox.service";
 import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
-import { generateEventPayload } from "../../utils/events";
-import { EVENT_TYPES } from "../../infrastructure/events/contracts/event-type";
+import { createDomainEvent } from "../../infrastructure/events/create-domain-event";
+import { EventType } from "../../infrastructure/events/contracts/event-type";
 import { AggregateType } from "../../infrastructure/events/contracts/aggregate-type";
+import { OutboxRepository } from "../../infrastructure/events/outBox/repository/outbox.repository";
 
 export type WorkoutCreatedEventPayload = {
   userId: string;
@@ -28,14 +29,12 @@ export const workoutRepository = {
     return prisma.workout.findMany();
   },
 
-  create(
-    userId: string,
-    workoutType: WorkoutType,
-    count: number,
-    headers?: Object,
-  ) {
+  create(userId: string, workoutType: WorkoutType, count: number) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       try {
+        const outboxRepositoryInstance = new OutboxRepository(
+          tx as PrismaClient,
+        );
         const workout = await tx.workout.create({
           data: { userId, workoutType, count },
         });
@@ -47,17 +46,16 @@ export const workoutRepository = {
         };
 
         const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
-          generateEventPayload<WorkoutCreatedEventPayload>({
+          createDomainEvent<WorkoutCreatedEventPayload>({
             aggregateId: workout.id,
             aggregateType: AggregateType.WORKOUT,
             causationId: workout.id,
             aggregateVersion: 1,
             payload,
-            headers,
-            eventType: EVENT_TYPES.WORKOUT_CREATED,
+            eventType: EventType.WORKOUT_CREATED,
           });
 
-        await saveEventRepository(tx, eventDetails);
+        await outboxRepositoryInstance.save(tx, eventDetails);
 
         return workout;
       } catch (error) {

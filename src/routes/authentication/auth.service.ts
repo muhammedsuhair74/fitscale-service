@@ -1,6 +1,5 @@
 import bcrypt from "bcrypt";
 import { JwtPayload } from "jsonwebtoken";
-import { User } from "@prisma/client";
 import { userRepository } from "../users/user.repository";
 import {
   // createUserService,
@@ -15,6 +14,7 @@ import {
   REFRESH_TOKEN_EXPIRY_SECONDS,
   verifyRefreshToken,
 } from "../../utils/jwt";
+import { User } from "@prisma/client";
 
 export const verifyRefreshTokenService = (refreshToken: string): JwtPayload => {
   if (!refreshToken) {
