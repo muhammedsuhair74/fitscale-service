@@ -1,0 +1,183 @@
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 1aa1e4d..2086735 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -35,9 +35,12 @@ services:
+         condition: service_healthy
+       redis:
+         condition: service_healthy
++      rabbitmq:
++        condition: service_healthy
+     environment:
+       DATABASE_URL: "postgresql://postgres:postgres@db:5432/fitscale?schema=public"
+       REDIS_URL: "redis://redis:6379"
++      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+       PORT: "5001"
+       NODE_ENV: production
+       JWT_SECRET: "${JWT_SECRET:-change-me-in-env}"
+@@ -58,10 +61,15 @@ services:
+       - api
+   rabbitmq:
+     image: rabbitmq:3-management
+-
++    restart: unless-stopped
+     ports:
+       - "5672:5672"
+       - "15672:15672"
++    healthcheck:
++      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
++      interval: 10s
++      timeout: 10s
++      retries: 10
+ 
+ volumes:
+   pgdata:
+diff --git a/src/infrastructure/events/create-domain-event.ts b/src/infrastructure/events/create-domain-event.ts
+index 62a6371..561e21d 100644
+--- a/src/infrastructure/events/create-domain-event.ts
++++ b/src/infrastructure/events/create-domain-event.ts
+@@ -1,8 +1,8 @@
+ import { AggregateType } from "./contracts/aggregate-type";
+ import { DomainEvent } from "./contracts/domain-event";
+ import { EventType } from "./contracts/event-type";
+-import { IdGenerator } from "./eventCollaborators/IdGenerator";
+-import { Clock } from "./eventCollaborators/Clock";
++import { Clock } from "./eventCollaborators/clocks/Clock";
++import { IdGenerator } from "./eventCollaborators/idGenerator/idGenerator";
+ 
+ interface CreateEventParams<T> {
+   correlationId: string;
+diff --git a/src/infrastructure/events/eventCollaborators/Clock.ts b/src/infrastructure/events/eventCollaborators/Clock.ts
+deleted file mode 100644
+index 89d4db7..0000000
+--- a/src/infrastructure/events/eventCollaborators/Clock.ts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-export interface Clock {
+-  now(): Date;
+-}
+diff --git a/src/infrastructure/events/eventCollaborators/IdGenerator.ts b/src/infrastructure/events/eventCollaborators/IdGenerator.ts
+deleted file mode 100644
+index 93cd792..0000000
+--- a/src/infrastructure/events/eventCollaborators/IdGenerator.ts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-export interface IdGenerator {
+-  generate(): string;
+-}
+diff --git a/src/infrastructure/events/eventCollaborators/SystemClock.ts b/src/infrastructure/events/eventCollaborators/SystemClock.ts
+deleted file mode 100644
+index c3bf0f9..0000000
+--- a/src/infrastructure/events/eventCollaborators/SystemClock.ts
++++ /dev/null
+@@ -1,9 +0,0 @@
+-interface Clock {
+-  now(): Date;
+-}
+-
+-class SystemClock implements Clock {
+-  now(): Date {
+-    return new Date();
+-  }
+-}
+diff --git a/src/infrastructure/events/eventCollaborators/UUIDGenerator.ts b/src/infrastructure/events/eventCollaborators/UUIDGenerator.ts
+deleted file mode 100644
+index e4b9b1e..0000000
+--- a/src/infrastructure/events/eventCollaborators/UUIDGenerator.ts
++++ /dev/null
+@@ -1,11 +0,0 @@
+-import { randomUUID } from "node:crypto";
+-
+-interface IdGenerator {
+-  generate(): string;
+-}
+-
+-class UUIDGenerator implements IdGenerator {
+-  generate(): string {
+-    return randomUUID();
+-  }
+-}
+diff --git a/src/infrastructure/events/index.ts b/src/infrastructure/events/index.ts
+index 4bcf4ea..3bfe024 100644
+--- a/src/infrastructure/events/index.ts
++++ b/src/infrastructure/events/index.ts
+@@ -1,8 +1,8 @@
+ import { AggregateType } from "./contracts/aggregate-type";
+-import { EventFactory } from "./create-domain-event";
+ import { CreateDomainEventParams } from "./contracts/create-domain-event-params";
+ import { DomainEvent } from "./contracts/domain-event";
+ import { EventType } from "./contracts/event-type";
++import EventFactory from "./create-domain-event";
+ 
+ export {
+   EventFactory,
+diff --git a/src/lib/rabbitmq.ts b/src/lib/rabbitmq.ts
+index 53d226b..ce152d1 100644
+--- a/src/lib/rabbitmq.ts
++++ b/src/lib/rabbitmq.ts
+@@ -5,7 +5,9 @@ import bindQueuesToExchange from "./rabbitmq.utils";
+ let channel: amqp.Channel | null = null;
+ 
+ export async function connectRabbit() {
+-  const connection = await amqp.connect("amqp://guest:guest@localhost:5672");
++  const connection = await amqp.connect(
++    process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672",
++  );
+ 
+   channel = await connection.createChannel();
+ 
+diff --git a/src/routes/workouts/workout.repository.ts b/src/routes/workouts/workout.repository.ts
+index f47d4e8..7b77ecb 100644
+--- a/src/routes/workouts/workout.repository.ts
++++ b/src/routes/workouts/workout.repository.ts
+@@ -2,10 +2,10 @@ import { Prisma, PrismaClient, Workout, WorkoutType } from "@prisma/client";
+ import { prisma } from "../../lib/prisma";
+ import { saveEventRepository } from "../../routes/outbox/outBox.service";
+ import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
+-import { createDomainEvent } from "../../infrastructure/events/create-domain-event";
+ import { EventType } from "../../infrastructure/events/contracts/event-type";
+ import { AggregateType } from "../../infrastructure/events/contracts/aggregate-type";
+ import { OutboxRepository } from "../../infrastructure/events/outBox/repository/outbox.repository";
++// import createDomainEvent from "../../infrastructure/events/create-domain-event";
+ 
+ export type WorkoutCreatedEventPayload = {
+   userId: string;
+@@ -39,23 +39,23 @@ export const workoutRepository = {
+           data: { userId, workoutType, count },
+         });
+ 
+-        const payload: WorkoutCreatedEventPayload = {
+-          userId,
+-          workoutType,
+-          count,
+-        };
++        // const payload: WorkoutCreatedEventPayload = {
++        //   userId,
++        //   workoutType,
++        //   count,
++        // };
+ 
+-        const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
+-          createDomainEvent<WorkoutCreatedEventPayload>({
+-            aggregateId: workout.id,
+-            aggregateType: AggregateType.WORKOUT,
+-            causationId: workout.id,
+-            aggregateVersion: 1,
+-            payload,
+-            eventType: EventType.WORKOUT_CREATED,
+-          });
++        // const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
++        //   createDomainEvent<WorkoutCreatedEventPayload>({
++        //     aggregateId: workout.id,
++        //     aggregateType: AggregateType.WORKOUT,
++        //     causationId: workout.id,
++        //     aggregateVersion: 1,
++        //     payload,
++        //     eventType: EventType.WORKOUT_CREATED,
++        //   });
+ 
+-        await outboxRepositoryInstance.save(tx, eventDetails);
++        // await outboxRepositoryInstance.save(tx, eventDetails);
+ 
+         return workout;
+       } catch (error) {

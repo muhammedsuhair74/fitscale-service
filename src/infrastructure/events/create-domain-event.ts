@@ -1,8 +1,8 @@
 import { AggregateType } from "./contracts/aggregate-type";
 import { DomainEvent } from "./contracts/domain-event";
 import { EventType } from "./contracts/event-type";
-import { IdGenerator } from "./eventCollaborators/IdGenerator";
-import { Clock } from "./eventCollaborators/Clock";
+import { Clock } from "./eventCollaborators/clocks/Clock";
+import { IdGenerator } from "./eventCollaborators/idGenerator/idGenerator";
 
 interface CreateEventParams<T> {
   correlationId: string;

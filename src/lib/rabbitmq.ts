@@ -5,7 +5,9 @@ import bindQueuesToExchange from "./rabbitmq.utils";
 let channel: amqp.Channel | null = null;
 
 export async function connectRabbit() {
-  const connection = await amqp.connect("amqp://guest:guest@localhost:5672");
+  const connection = await amqp.connect(
+    process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672",
+  );
 
   channel = await connection.createChannel();
 

@@ -35,9 +35,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       DATABASE_URL: "postgresql://postgres:postgres@db:5432/fitscale?schema=public"
       REDIS_URL: "redis://redis:6379"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
       PORT: "5001"
       NODE_ENV: production
       JWT_SECRET: "${JWT_SECRET:-change-me-in-env}"
@@ -58,10 +61,15 @@ services:
       - api
   rabbitmq:
     image: rabbitmq:3-management
-
+    restart: unless-stopped
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
 
 volumes:
   pgdata:
