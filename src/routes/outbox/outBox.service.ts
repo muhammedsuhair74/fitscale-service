@@ -8,17 +8,11 @@ const outboxRepositoryInstance = new OutboxRepository(prisma);
 export const saveEventRepository = async (
   tx: Prisma.TransactionClient,
   event: DomainEvent<unknown>,
-) => {
+): Promise<boolean> => {
   try {
-    const result = await outboxRepositoryInstance.save(tx, event);
-
-    return { success: true, data: event };
+    await outboxRepositoryInstance.save(tx, event);
+    return true;
   } catch (error) {
     throw error;
   }
 };
-
-// export const createEventService = async (event: any) => {
-//   const events = await Event.findAll();
-//   return events;
-// };

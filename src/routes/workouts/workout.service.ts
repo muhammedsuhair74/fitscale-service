@@ -1,7 +1,7 @@
 import { Workout, WorkoutType } from "@prisma/client";
 import { workoutRepository } from "./workout.repository";
 import { redis } from "../../lib/redis";
-import { cacheKeys } from "../../lib/constants";
+import { cacheKeys, WorkoutEventType } from "../../lib/constants";
 import { getCache, setCache } from "../../lib/cache";
 import {
   publishWorkoutCreated,
@@ -9,6 +9,7 @@ import {
   publishWorkoutUpdated,
 } from "../../events/publishers/workout.publisher";
 import { invalidateWorkoutCaches } from "../../infrastructure/redis/invalidate";
+import { EventFactory, EventType } from "../../infrastructure/events";
 
 export const invalidateWorkoutCachesKeys = (userId: string) => [
   cacheKeys.allWorkouts,
@@ -19,14 +20,19 @@ export const createWorkoutService = async (
   userId: string,
   workoutType: WorkoutType,
   count: number,
+  eventFactory: EventFactory,
 ): Promise<Workout> => {
-  const workout = await workoutRepository.create(userId, workoutType, count);
+  const workout = await workoutRepository.create(
+    userId,
+    workoutType,
+    count,
+    eventFactory,
+  );
 
   const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
 
   await invalidateWorkoutCaches(cacheKeysToInvalidate);
 
-  // publishWorkoutCreated(workout.id, workout.userId, workout.workoutType);
   return workout;
 };
 

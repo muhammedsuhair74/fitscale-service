@@ -1,11 +1,9 @@
 import { Prisma, PrismaClient, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { saveEventRepository } from "../../routes/outbox/outBox.service";
-import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
 import { EventType } from "../../infrastructure/events/contracts/event-type";
 import { AggregateType } from "../../infrastructure/events/contracts/aggregate-type";
-import { OutboxRepository } from "../../infrastructure/events/outBox/repository/outbox.repository";
-// import createDomainEvent from "../../infrastructure/events/create-domain-event";
+import { EventFactory } from "../../infrastructure/events";
 
 export type WorkoutCreatedEventPayload = {
   userId: string;
@@ -29,36 +27,36 @@ export const workoutRepository = {
     return prisma.workout.findMany();
   },
 
-  create(userId: string, workoutType: WorkoutType, count: number) {
+  create(
+    userId: string,
+    workoutType: WorkoutType,
+    count: number,
+    eventFactory: EventFactory,
+  ) {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       try {
-        const outboxRepositoryInstance = new OutboxRepository(
-          tx as PrismaClient,
-        );
         const workout = await tx.workout.create({
           data: { userId, workoutType, count },
         });
 
-        // const payload: WorkoutCreatedEventPayload = {
-        //   userId,
-        //   workoutType,
-        //   count,
-        // };
-
-        // const eventDetails: DomainEvent<WorkoutCreatedEventPayload> =
-        //   createDomainEvent<WorkoutCreatedEventPayload>({
-        //     aggregateId: workout.id,
-        //     aggregateType: AggregateType.WORKOUT,
-        //     causationId: workout.id,
-        //     aggregateVersion: 1,
-        //     payload,
-        //     eventType: EventType.WORKOUT_CREATED,
-        //   });
-
-        // await outboxRepositoryInstance.save(tx, eventDetails);
-
+        const event = eventFactory.create<WorkoutCreatedEventPayload>({
+          correlationId: workout.id,
+          causationId: workout.id,
+          aggregateType: AggregateType.WORKOUT,
+          aggregateId: workout.id,
+          aggregateVersion: 1,
+          payload: { userId, workoutType, count },
+          eventType: EventType.WORKOUT_CREATED,
+        });
+        const result = await saveEventRepository(tx, event);
+        if (!result) {
+          await tx.$executeRawUnsafe("ROLLBACK");
+          throw new Error("Failed to save event");
+        }
+        await tx.$executeRawUnsafe("COMMIT");
         return workout;
       } catch (error) {
+        await tx.$executeRawUnsafe("ROLLBACK");
         throw error;
       }
     });
