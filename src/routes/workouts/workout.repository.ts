@@ -1,9 +1,5 @@
 import { Prisma, PrismaClient, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
-import { saveEventRepository } from "../../routes/outbox/outBox.service";
-import { EventType } from "../../infrastructure/events/contracts/event-type";
-import { AggregateType } from "../../infrastructure/events/contracts/aggregate-type";
-import { EventFactory } from "../../infrastructure/events";
 
 export type WorkoutCreatedEventPayload = {
   userId: string;
@@ -31,34 +27,10 @@ export const workoutRepository = {
     userId: string,
     workoutType: WorkoutType,
     count: number,
-    eventFactory: EventFactory,
+    tx?: Prisma.TransactionClient,
   ) {
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      try {
-        const workout = await tx.workout.create({
-          data: { userId, workoutType, count },
-        });
-
-        const event = eventFactory.create<WorkoutCreatedEventPayload>({
-          correlationId: workout.id,
-          causationId: workout.id,
-          aggregateType: AggregateType.WORKOUT,
-          aggregateId: workout.id,
-          aggregateVersion: 1,
-          payload: { userId, workoutType, count },
-          eventType: EventType.WORKOUT_CREATED,
-        });
-        const result = await saveEventRepository(tx, event);
-        if (!result) {
-          await tx.$executeRawUnsafe("ROLLBACK");
-          throw new Error("Failed to save event");
-        }
-        await tx.$executeRawUnsafe("COMMIT");
-        return workout;
-      } catch (error) {
-        await tx.$executeRawUnsafe("ROLLBACK");
-        throw error;
-      }
+    return (tx ?? prisma).workout.create({
+      data: { userId, workoutType, count },
     });
   },
 
