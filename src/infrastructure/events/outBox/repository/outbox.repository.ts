@@ -30,7 +30,7 @@ export class OutboxRepository implements IOutboxRepository {
     tx: Prisma.TransactionClient,
     event: DomainEvent<unknown>,
   ): Promise<void> {
-    const created = await tx.outbox.create({
+    await tx.outbox.create({
       data: {
         eventId: event.eventId,
         eventType: event.eventType,
@@ -46,10 +46,6 @@ export class OutboxRepository implements IOutboxRepository {
         sourceService: EventSourceTypes.WORKOUT_CREATED,
       },
     });
-
-    if (!created) {
-      throw new Error("Failed to save event to outbox");
-    }
   }
 
   async findPending(batchSize: number): Promise<OutboxRow[]> {

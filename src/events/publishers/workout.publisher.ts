@@ -1,4 +1,4 @@
-import { WorkoutType } from "@prisma/client";
+import { PrismaClient, WorkoutType } from "@prisma/client";
 import { getChannel } from "../../lib/rabbitmq";
 import {
   eventPayload,
@@ -6,6 +6,7 @@ import {
   WorkoutEventType,
 } from "../../lib/constants";
 import { DomainEvent } from "../../infrastructure/events/contracts/domain-event";
+import { EventFactory, EventType } from "../../infrastructure/events";
 
 function enqueueWorkoutSync(payload: eventPayload<unknown>) {
   const channel = getChannel();
@@ -16,12 +17,20 @@ function enqueueWorkoutSync(payload: eventPayload<unknown>) {
   );
 }
 
-export async function publishWorkoutCreated<T>({
-  eventType,
-  payload,
-}: DomainEvent<T>) {
-  console.log("publishWorkoutCreated", payload);
-  console.log("eventType", eventType);
+export async function publishWorkoutCreated({
+  transaction,
+  eventFactory,
+}: {
+  transaction: PrismaClient;
+  eventFactory: EventFactory;
+}) {
+  await setTimeout(async () => {
+    return true;
+    // await transaction.workout.update({
+    //   where: { id: event.aggregateId },
+    //   data: { version: event.aggregateVersion + 1 },
+    // });
+  }, 1000);
 }
 
 export function publishWorkoutUpdated(

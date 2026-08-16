@@ -6,6 +6,7 @@ import {
   getWorkoutByIdService,
   getWorkoutsService,
 } from "./workout.service";
+import { eventFactory } from "../../app/dependencies";
 
 type AuthUser = { userId: string };
 
@@ -16,7 +17,12 @@ export const createWorkoutController = async (
   try {
     const { userId } = (req as Request & { user: AuthUser }).user;
     const { workoutType, count } = req.body;
-    const workout = await createWorkoutService(userId, workoutType, count);
+    const workout = await createWorkoutService(
+      userId,
+      workoutType,
+      count,
+      eventFactory,
+    );
     res.status(201).json({
       workout,
       success: true,
