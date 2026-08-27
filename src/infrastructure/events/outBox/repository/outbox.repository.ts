@@ -5,32 +5,26 @@ import {
   PrismaClient,
 } from "@prisma/client";
 import { DomainEvent } from "../../contracts/domain-event";
+import { EventStore } from "../../eventStores/eventStore";
+import { TransactionContext } from "../../../../lib/transactionService";
 
 type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
-interface IOutboxRepository {
-  save(
-    tx: Prisma.TransactionClient,
-    event: DomainEvent<unknown>,
-  ): Promise<void>;
-
-  findPending(batchSize: number): Promise<OutboxRow[]>;
-
-  markPublished(id: string): Promise<void>;
-
-  markFailed(id: string, reason: string): Promise<void>;
-
-  incrementRetry(id: string, nextRetryAt: Date, reason: string): Promise<void>;
-}
-
-export class OutboxRepository implements IOutboxRepository {
+export class OutboxRepository implements EventStore {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async save(
-    tx: Prisma.TransactionClient,
-    event: DomainEvent<unknown>,
-  ): Promise<void> {
-    await tx.outbox.create({
+  async save({
+    transactionContext,
+    event,
+    producer,
+    sourceService,
+  }: {
+    transactionContext: TransactionContext;
+    event: DomainEvent<unknown>;
+    producer: EventSourceTypes;
+    sourceService: EventSourceTypes;
+  }): Promise<void> {
+    await transactionContext.prisma.outbox.create({
       data: {
         eventId: event.eventId,
         eventType: event.eventType,
@@ -41,9 +35,9 @@ export class OutboxRepository implements IOutboxRepository {
         causationId: event.causationId,
         payload: event.payload as Prisma.InputJsonValue,
         status: OutBoxStatus.PENDING,
-        producer: EventSourceTypes.WORKOUT_CREATED,
+        producer,
         routingKey: event.eventType,
-        sourceService: EventSourceTypes.WORKOUT_CREATED,
+        sourceService,
       },
     });
   }

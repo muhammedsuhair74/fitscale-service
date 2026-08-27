@@ -1,4 +1,4 @@
-import { AggregateType, Prisma, Workout, WorkoutType } from "@prisma/client";
+import { EventSourceTypes, Prisma, Workout, WorkoutType } from "@prisma/client";
 import {
   WorkoutCreatedEventPayload,
   workoutRepository,
@@ -12,9 +12,16 @@ import {
   publishWorkoutUpdated,
 } from "../../events/publishers/workout.publisher";
 import { invalidateWorkoutCaches } from "../../infrastructure/redis/invalidate";
-import { EventFactory, EventType } from "../../infrastructure/events";
-import { prisma } from "../../lib/prisma";
-import { saveEventRepository } from "../outbox/outBox.service";
+import {
+  AggregateType,
+  EventFactory,
+  EventType,
+} from "../../infrastructure/events";
+import {
+  TransactionContext,
+  TransactionService,
+} from "../../lib/transactionService";
+import { createEventFactory, createEventStore } from "../../app/dependencies";
 
 export const invalidateWorkoutCachesKeys = (userId: string) => [
   cacheKeys.allWorkouts,
@@ -25,34 +32,45 @@ export const createWorkoutService = async (
   userId: string,
   workoutType: WorkoutType,
   count: number,
-  eventFactory: EventFactory,
 ): Promise<Workout> => {
-  return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const workout = await workoutRepository.create(
-      userId,
-      workoutType,
-      count,
-      tx,
-    );
+  const transactionService = new TransactionService();
 
-    const event = eventFactory.create<WorkoutCreatedEventPayload>({
-      correlationId: workout.id,
-      causationId: workout.id,
-      aggregateType: AggregateType.WORKOUT,
-      aggregateId: workout.id,
-      aggregateVersion: 1,
-      payload: { userId, workoutType, count },
-      eventType: EventType.WORKOUT_CREATED,
-    });
+  const workout = await transactionService.execute(
+    async (transactionContext: TransactionContext) => {
+      const eventStore = createEventStore(transactionContext);
+      const eventFactory = createEventFactory;
+      const workoutData = await workoutRepository.create(
+        userId,
+        workoutType,
+        count,
+        transactionContext,
+      );
 
-    await saveEventRepository(tx, event);
+      const event = eventFactory.create<WorkoutCreatedEventPayload>({
+        correlationId: workoutData.id,
+        causationId: workoutData.id,
+        aggregateType: AggregateType.WORKOUT,
+        aggregateId: workoutData.id,
+        aggregateVersion: 1,
+        payload: { userId, workoutType, count },
+        eventType: EventType.WORKOUT_CREATED,
+      });
 
-    const cacheKeysToInvalidate = invalidateWorkoutCachesKeys(userId);
+      await eventStore.save({
+        transactionContext,
+        event,
+        producer: EventSourceTypes.WORKOUT_CREATED,
+        sourceService: EventSourceTypes.WORKOUT_CREATED,
+      });
 
-    await invalidateWorkoutCaches(cacheKeysToInvalidate);
+      return workoutData;
+    },
+  );
 
-    return workout;
-  });
+  if (!workout) throw new Error("Workout not found");
+
+  await invalidateWorkoutCaches(invalidateWorkoutCachesKeys(userId));
+  return workout;
 };
 
 export const getWorkoutsService = async (

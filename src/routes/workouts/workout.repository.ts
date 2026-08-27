@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, Workout, WorkoutType } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { TransactionContext } from "../../lib/transactionService";
 
 export type WorkoutCreatedEventPayload = {
   userId: string;
@@ -27,9 +28,9 @@ export const workoutRepository = {
     userId: string,
     workoutType: WorkoutType,
     count: number,
-    tx?: Prisma.TransactionClient,
+    transactionContext: TransactionContext,
   ) {
-    return (tx ?? prisma).workout.create({
+    return transactionContext.prisma.workout.create({
       data: { userId, workoutType, count },
     });
   },
