@@ -5,32 +5,26 @@ import {
   PrismaClient,
 } from "@prisma/client";
 import { DomainEvent } from "../../contracts/domain-event";
+import { EventStore } from "../../eventStores/eventStore";
+import { TransactionContext } from "../../../../lib/transactionService";
 
 type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
-interface IOutboxRepository {
-  save(
-    tx: Prisma.TransactionClient,
-    event: DomainEvent<unknown>,
-  ): Promise<void>;
+export class OutboxRepository implements EventStore {
+  constructor(private readonly transactionContext: TransactionContext) {}
 
-  findPending(batchSize: number): Promise<OutboxRow[]>;
-
-  markPublished(id: string): Promise<void>;
-
-  markFailed(id: string, reason: string): Promise<void>;
-
-  incrementRetry(id: string, nextRetryAt: Date, reason: string): Promise<void>;
-}
-
-export class OutboxRepository implements IOutboxRepository {
-  constructor(private readonly prisma: PrismaClient) {}
-
-  async save(
-    tx: Prisma.TransactionClient,
-    event: DomainEvent<unknown>,
-  ): Promise<void> {
-    await tx.outbox.create({
+  async save({
+    transactionContext,
+    event,
+    producer,
+    sourceService,
+  }: {
+    transactionContext: TransactionContext;
+    event: DomainEvent<unknown>;
+    producer: EventSourceTypes;
+    sourceService: EventSourceTypes;
+  }): Promise<void> {
+    await transactionContext.outbox.create({
       data: {
         eventId: event.eventId,
         eventType: event.eventType,
@@ -41,15 +35,15 @@ export class OutboxRepository implements IOutboxRepository {
         causationId: event.causationId,
         payload: event.payload as Prisma.InputJsonValue,
         status: OutBoxStatus.PENDING,
-        producer: EventSourceTypes.WORKOUT_CREATED,
+        producer,
         routingKey: event.eventType,
-        sourceService: EventSourceTypes.WORKOUT_CREATED,
+        sourceService,
       },
     });
   }
 
   async findPending(batchSize: number): Promise<OutboxRow[]> {
-    return this.prisma.outbox.findMany({
+    return this.transactionContext.outbox.findMany({
       where: {
         status: OutBoxStatus.PENDING,
       },
@@ -58,7 +52,7 @@ export class OutboxRepository implements IOutboxRepository {
   }
 
   async markPublished(id: string): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.PUBLISHED,
@@ -68,7 +62,7 @@ export class OutboxRepository implements IOutboxRepository {
   }
 
   async markFailed(id: string, reason: string): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.FAILED,
@@ -82,7 +76,7 @@ export class OutboxRepository implements IOutboxRepository {
     nextRetryAt: Date,
     reason: string,
   ): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.PROCESSING,
