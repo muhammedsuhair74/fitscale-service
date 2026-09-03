@@ -11,4 +11,4 @@ export const createEventFactory = new EventFactory({
 });
 
 export const createEventStore = (transactionContext: TransactionContext) =>
-  new OutboxRepository(transactionContext.prisma);
+  new OutboxRepository(transactionContext);

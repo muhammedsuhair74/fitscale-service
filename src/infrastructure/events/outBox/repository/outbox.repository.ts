@@ -11,7 +11,7 @@ import { TransactionContext } from "../../../../lib/transactionService";
 type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
 export class OutboxRepository implements EventStore {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly transactionContext: TransactionContext) {}
 
   async save({
     transactionContext,
@@ -24,7 +24,7 @@ export class OutboxRepository implements EventStore {
     producer: EventSourceTypes;
     sourceService: EventSourceTypes;
   }): Promise<void> {
-    await transactionContext.prisma.outbox.create({
+    await transactionContext.outbox.create({
       data: {
         eventId: event.eventId,
         eventType: event.eventType,
@@ -43,7 +43,7 @@ export class OutboxRepository implements EventStore {
   }
 
   async findPending(batchSize: number): Promise<OutboxRow[]> {
-    return this.prisma.outbox.findMany({
+    return this.transactionContext.outbox.findMany({
       where: {
         status: OutBoxStatus.PENDING,
       },
@@ -52,7 +52,7 @@ export class OutboxRepository implements EventStore {
   }
 
   async markPublished(id: string): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.PUBLISHED,
@@ -62,7 +62,7 @@ export class OutboxRepository implements EventStore {
   }
 
   async markFailed(id: string, reason: string): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.FAILED,
@@ -76,7 +76,7 @@ export class OutboxRepository implements EventStore {
     nextRetryAt: Date,
     reason: string,
   ): Promise<void> {
-    await this.prisma.outbox.update({
+    await this.transactionContext.outbox.update({
       where: { id },
       data: {
         status: OutBoxStatus.PROCESSING,

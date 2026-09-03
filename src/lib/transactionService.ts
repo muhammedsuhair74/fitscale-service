@@ -4,9 +4,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "./prisma";
 
-export interface TransactionContext {
-  prisma: PrismaClient;
-}
+export type TransactionContext = PrismaClient;
 export interface TransactionServiceInterface {
   execute<T>(
     operation: (context: TransactionContext) => Promise<T>,
@@ -18,7 +16,7 @@ export class TransactionService implements TransactionServiceInterface {
     operation: (context: TransactionContext) => Promise<T>,
   ): Promise<T> {
     return prisma.$transaction(async (tx) => {
-      return operation({ prisma: tx as PrismaClient });
+      return operation(tx as PrismaClient);
     });
   }
 }

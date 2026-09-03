@@ -30,7 +30,7 @@ export const workoutRepository = {
     count: number,
     transactionContext: TransactionContext,
   ) {
-    return transactionContext.prisma.workout.create({
+    return transactionContext.workout.create({
       data: { userId, workoutType, count },
     });
   },
