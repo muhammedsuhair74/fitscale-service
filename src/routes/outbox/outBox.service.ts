@@ -4,7 +4,7 @@ import { OutboxRepository } from "../../infrastructure/events/outBox/repository/
 import { prisma } from "../../lib/prisma";
 import { TransactionContext } from "../../lib/transactionService";
 
-const outboxRepositoryInstance = new OutboxRepository(prisma);
+const outboxRepositoryInstance = new OutboxRepository();
 
 export const saveEventRepository = async ({
   transactionContext,
@@ -19,7 +19,6 @@ export const saveEventRepository = async ({
 }): Promise<boolean> => {
   try {
     await outboxRepositoryInstance.save({
-      transactionContext,
       event,
       producer,
       sourceService,

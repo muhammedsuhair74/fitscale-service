@@ -3,6 +3,7 @@ import { DomainEvent } from "./contracts/domain-event";
 import { EventType } from "./contracts/event-type";
 import { Clock } from "./eventCollaborators/clocks/Clock";
 import { IdGenerator } from "./eventCollaborators/idGenerator/idGenerator";
+import { EVENT_ROUTING_KEYS } from "../../lib/constants";
 
 interface CreateEventParams<T> {
   correlationId: string;
@@ -12,6 +13,7 @@ interface CreateEventParams<T> {
   aggregateType: AggregateType;
   aggregateVersion: number;
   payload: T;
+  routingKey: (typeof EVENT_ROUTING_KEYS)[keyof typeof EventType];
 }
 
 class EventFactory {

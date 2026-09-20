@@ -5,13 +5,23 @@ import { TransactionContext } from "../../../lib/transactionService";
 // type OutboxRow = Prisma.OutboxGetPayload<Record<string, never>>;
 
 export interface EventStore {
-  save({
+  saveInTransaction({
     transactionContext,
     event,
     producer,
     sourceService,
   }: {
     transactionContext: TransactionContext;
+    event: DomainEvent<unknown>;
+    producer: EventSourceTypes;
+    sourceService: EventSourceTypes;
+  }): Promise<void>;
+
+  save({
+    event,
+    producer,
+    sourceService,
+  }: {
     event: DomainEvent<unknown>;
     producer: EventSourceTypes;
     sourceService: EventSourceTypes;

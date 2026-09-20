@@ -1,6 +1,7 @@
 import { getChannel } from "../../lib/rabbitmq";
-import { RABBITMQ_EXCHANGE, RABBITMQ_QUEUE_NAMES } from "../../lib/constants";
+import { RABBITMQ_QUEUE_NAMES } from "../../lib/constants";
 import { syncTotalWorkoutCountService } from "../../routes/totalWorkout/total-workout.service";
+import { parseWorkoutSyncMessage } from "../parse-workout-sync-message";
 
 export function startTotalWorkoutsConsumer() {
   const channel = getChannel();
@@ -9,13 +10,30 @@ export function startTotalWorkoutsConsumer() {
     if (!message) return;
 
     try {
-      const payload = JSON.parse(message.content.toString());
+      const parsed = JSON.parse(message.content.toString()) as unknown;
+      const payload = parseWorkoutSyncMessage(parsed);
+
+      if (!payload) {
+        console.error("Total workouts consumer dropped invalid message:", parsed);
+        channel.nack(message, false, false);
+        return;
+      }
 
       await syncTotalWorkoutCountService(payload.userId, payload.workoutType);
 
+      if (
+        payload.previousWorkoutType &&
+        payload.previousWorkoutType !== payload.workoutType
+      ) {
+        await syncTotalWorkoutCountService(
+          payload.userId,
+          payload.previousWorkoutType,
+        );
+      }
+
       channel.sendToQueue(
         RABBITMQ_QUEUE_NAMES.BADGE_EVALUATION,
-        Buffer.from(JSON.stringify(payload)),
+        Buffer.from(JSON.stringify({ userId: payload.userId })),
         {
           persistent: true,
         },

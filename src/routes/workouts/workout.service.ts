@@ -4,7 +4,11 @@ import {
   workoutRepository,
 } from "./workout.repository";
 import { redis } from "../../lib/redis";
-import { cacheKeys, WorkoutEventType } from "../../lib/constants";
+import {
+  cacheKeys,
+  EVENT_ROUTING_KEYS,
+  WorkoutEventType,
+} from "../../lib/constants";
 import { getCache, setCache } from "../../lib/cache";
 import {
   publishWorkoutCreated,
@@ -37,7 +41,7 @@ export const createWorkoutService = async (
 
   const workout = await transactionService.execute(
     async (transactionContext: TransactionContext) => {
-      const eventStore = createEventStore(transactionContext);
+      const eventStore = createEventStore();
       const eventFactory = createEventFactory;
       const workoutData = await workoutRepository.create(
         userId,
@@ -54,9 +58,10 @@ export const createWorkoutService = async (
         aggregateVersion: 1,
         payload: { userId, workoutType, count },
         eventType: EventType.WORKOUT_CREATED,
+        routingKey: EVENT_ROUTING_KEYS.WORKOUT_CREATED,
       });
 
-      await eventStore.save({
+      await eventStore.saveInTransaction({
         transactionContext,
         event,
         producer: EventSourceTypes.WORKOUT_CREATED,

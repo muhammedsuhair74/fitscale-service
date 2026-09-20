@@ -1,6 +1,7 @@
 export enum AggregateType {
   USER = "USER",
   WORKOUT = "WORKOUT",
+  TOTAL_WORKOUT = "TOTAL_WORKOUT",
   BADGE = "BADGE",
   NOTIFICATION = "NOTIFICATION",
 }
