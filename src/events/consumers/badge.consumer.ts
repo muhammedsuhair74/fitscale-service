@@ -9,12 +9,22 @@ export function startBadgeWorker() {
     if (!message) return;
 
     try {
-      const payload = JSON.parse(message.content.toString());
+      const parsed = JSON.parse(message.content.toString()) as {
+        userId?: string;
+        payload?: { userId?: string };
+      };
+      const userId = parsed.userId ?? parsed.payload?.userId;
 
-      await evaluateAllBadges(payload.userId);
+      if (!userId) {
+        console.error("Badge worker dropped invalid message:", parsed);
+        channel.nack(message, false, false);
+        return;
+      }
+
+      await evaluateAllBadges(userId);
       channel.sendToQueue(
         RABBITMQ_QUEUE_NAMES.NOTIFICATIONS,
-        Buffer.from(JSON.stringify(payload)),
+        Buffer.from(JSON.stringify({ userId })),
         { persistent: true },
       );
       channel.ack(message);

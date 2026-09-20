@@ -20,11 +20,14 @@ enum UserRoles {
 enum EventSourceTypes {
   WORKOUT_CREATED
   WORKOUT_UPDATED
+  TOTAL_WORKOUT
+  BADGE
 }
 
 enum AggregateType {
   USER
   WORKOUT
+  TOTAL_WORKOUT
   BADGE
   NOTIFICATION
 }
@@ -73,6 +76,8 @@ enum EventTypes {
   WORKOUT_CREATED
   WORKOUT_UPDATED
   WORKOUT_DELETED
+  TOTAL_WORKOUT_UPDATED
+  BADGE_AWARDED
 }
 
 model User {
@@ -134,8 +139,11 @@ model Outbox {
 
 model ProcessedEvent {
   id String @id @default(uuid())
-  eventId String @unique
+  eventId String
+  consumerName String
   processedAt DateTime @default(now())
+  
+  @@unique([eventId, consumerName])
 }
 
 model Badge {
